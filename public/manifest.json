@@ -1,0 +1,17 @@
+{
+  "name": "Fluency AI - Real Spoken English",
+  "short_name": "Fluency AI",
+  "description": "Aprenda o inglês falado dos EUA com IA e prática em tempo real.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#4f46e5",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
