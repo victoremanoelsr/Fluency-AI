@@ -1,220 +1,236 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { StorageService } from '../../services/storage';
-import { supabaseService } from '../../services/supabase';
-import { speechAudio } from '../../services/speechAudio';
-import { 
-  KeyRound, Volume2, Sparkles, Sliders, ShieldCheck, 
-  RotateCcw, Info, CheckCircle2, User, Database, ExternalLink 
-} from 'lucide-react';
+import { Key, Sparkles, Check, ArrowLeft } from 'lucide-react';
 
-export const SettingsView = ({ onOpenApiKey, hasApiKey }) => {
-  const [settings, setSettings] = useState(StorageService.getSettings());
-  const [voices, setVoices] = useState([]);
-  const [saved, setSaved] = useState(false);
+export const SettingsView = ({ onBack }) => {
+  const [activeTab, setActiveTab] = useState('conta');
+  const [openAiKey, setOpenAiKey] = useState(StorageService.getOpenAiKey());
+  const [geminiKey, setGeminiKey] = useState(StorageService.getApiKey());
+  const [aiProvider, setAiProvider] = useState(StorageService.getSettings().aiProvider || 'openai');
+  const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Supabase states
-  const [supabaseUrl, setSupabaseUrl] = useState(supabaseService.getCredentials().url);
-  const [supabaseAnonKey, setSupabaseAnonKey] = useState(supabaseService.getCredentials().anonKey);
-  const [isSupabaseSaved, setIsSupabaseSaved] = useState(false);
-
-  useEffect(() => {
-    const list = speechAudio.getAvailableVoices();
-    setVoices(list);
-  }, []);
-
-  const handleChange = (key, value) => {
-    const updated = { ...settings, [key]: value };
-    setSettings(updated);
-    StorageService.saveSettings(updated);
-
-    if (key === 'preferredVoice') {
-      speechAudio.setVoiceByName(value);
-    }
-
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1200);
-  };
-
-  const handleSaveSupabase = (e) => {
-    e.preventDefault();
-    supabaseService.setCredentials(supabaseUrl, supabaseAnonKey);
-    setIsSupabaseSaved(true);
-    setTimeout(() => setIsSupabaseSaved(false), 2000);
-  };
-
-  const handleTestVoice = () => {
-    speechAudio.speak("Hey there! This is what spoken English sounds like with your current settings.", {
-      rate: settings.voiceSpeed,
-      pitch: settings.voicePitch
-    });
+  const handleSaveKeys = () => {
+    StorageService.setOpenAiKey(openAiKey);
+    StorageService.setApiKey(geminiKey);
+    const settings = StorageService.getSettings();
+    StorageService.saveSettings({ ...settings, aiProvider });
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 pb-24 space-y-5 animate-fadeIn">
+    <div className="max-w-3xl mx-auto p-6 space-y-6 select-none animate-fadeIn">
       
-      {/* Title */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-            <span>Configurações & Banco de Dados</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Ajuste voz, Gemini Flash e banco de dados Supabase.
-          </p>
-        </div>
+      {/* Back Button if present */}
+      {onBack && (
+        <button 
+          onClick={onBack}
+          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Voltar ao Início</span>
+        </button>
+      )}
 
-        {saved && (
-          <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 animate-fadeIn">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Salvo!
-          </span>
-        )}
+      {/* Top Tabs */}
+      <div className="flex items-center gap-8 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('conta')}
+          className={`pb-3 text-sm font-bold transition-all relative ${
+            activeTab === 'conta' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Conta
+          {activeTab === 'conta' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-sky-600 rounded-full"></span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('assinatura')}
+          className={`pb-3 text-sm font-bold transition-all relative ${
+            activeTab === 'assinatura' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Assinatura
+          {activeTab === 'assinatura' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-sky-600 rounded-full"></span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ajuda')}
+          className={`pb-3 text-sm font-bold transition-all relative ${
+            activeTab === 'ajuda' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          Ajuda & Suporte
+          {activeTab === 'ajuda' && (
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-sky-600 rounded-full"></span>
+          )}
+        </button>
       </div>
 
-      {/* Gemini Flash API Key Box */}
-      <div className="glass-panel p-4 sm:p-5 rounded-2xl border-slate-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-sm">Google Gemini Flash</h3>
-              <p className="text-xs text-slate-400">
-                {hasApiKey ? 'Chave de API ativa' : 'Configure sua chave gratuita'}
-              </p>
-            </div>
-          </div>
-
-          <button
-            onClick={onOpenApiKey}
-            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all"
-          >
-            {hasApiKey ? 'Alterar Chave' : 'Adicionar Chave'}
-          </button>
-        </div>
-      </div>
-
-      {/* Supabase Cloud Database Box */}
-      <div className="glass-panel p-4 sm:p-5 rounded-2xl border-slate-800 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                <span>Banco de Dados Supabase</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  supabaseService.isConfigured() ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400'
-                }`}>
-                  {supabaseService.isConfigured() ? 'Conectado na Nuvem' : 'Modo Offline/Local'}
-                </span>
-              </h3>
-              <p className="text-xs text-slate-400">
-                Sincronize histórico, vocabulário e progresso entre Celular e PC
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSaveSupabase} className="space-y-3 pt-1">
+      {/* Tab: Conta */}
+      {activeTab === 'conta' && (
+        <div className="space-y-6">
+          
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Project URL do Supabase:
-            </label>
-            <input
-              type="text"
-              placeholder="https://seu-projeto.supabase.co"
-              value={supabaseUrl}
-              onChange={(e) => setSupabaseUrl(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500"
-            />
+            <h2 className="text-xl font-black text-slate-800">Conta</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Gerencie as configurações da sua conta.</p>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Anon / Public API Key:
-            </label>
-            <input
-              type="password"
-              placeholder="Cole sua chave anon/public aqui"
-              value={supabaseAnonKey}
-              onChange={(e) => setSupabaseAnonKey(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-emerald-500"
-            />
-          </div>
+          {/* Google Account Card */}
+          <div className="p-5 rounded-2xl border border-slate-100 bg-slate-50/60 flex items-center justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-white shadow-xs border border-slate-100 flex items-center justify-center">
+                <span className="font-black text-lg text-blue-500">G</span>
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-slate-800">Conta Google</h4>
+                <p className="text-xs text-slate-400">victor.esr6@gmail.com</p>
+              </div>
+            </div>
 
-          <div className="flex items-center justify-between pt-1">
-            <a
-              href="https://supabase.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-emerald-400 hover:underline flex items-center gap-1"
+            <button 
+              onClick={() => alert('Sessão encerrada com sucesso.')}
+              className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
             >
-              <span>Criar projeto grátis no Supabase</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
-
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
-            >
-              {isSupabaseSaved ? <CheckCircle2 className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
-              <span>{isSupabaseSaved ? 'Salvo no Supabase!' : 'Salvar Conexão'}</span>
+              Sair
             </button>
           </div>
-        </form>
-      </div>
 
-      {/* Voice & Audio Controls */}
-      <div className="glass-panel p-4 sm:p-5 rounded-2xl border-slate-800 space-y-4">
-        <h3 className="font-bold text-white text-sm flex items-center gap-2">
-          <Volume2 className="w-4 h-4 text-indigo-400" />
-          <span>Configurações de Voz & Áudio</span>
-        </h3>
+          {/* AI Brain Key Configuration Card */}
+          <div className="p-5 rounded-2xl border border-slate-100 bg-white shadow-xs space-y-4">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-sky-500" />
+              <h3 className="font-extrabold text-sm text-slate-800">Cérebro da IA (OpenAI / Gemini)</h3>
+            </div>
+            <p className="text-xs text-slate-500">
+              O Learna AI funciona perfeitamente no modo simulado. Se preferir usar sua própria chave da OpenAI (GPT-4o) ou Google Gemini, insira abaixo:
+            </p>
 
-        {/* Speed Slider */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-300 font-semibold">Velocidade da Fala:</span>
-            <span className="font-mono text-indigo-400 font-bold">{settings.voiceSpeed}x</span>
+            {/* Provider selector */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setAiProvider('openai')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  aiProvider === 'openai' 
+                    ? 'bg-sky-500 text-white shadow-xs' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                OpenAI (GPT-4o)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiProvider('gemini')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  aiProvider === 'gemini' 
+                    ? 'bg-sky-500 text-white shadow-xs' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Google Gemini
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiProvider('simulated')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  aiProvider === 'simulated' 
+                    ? 'bg-sky-500 text-white shadow-xs' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Modo Simulado (Zero Config)
+              </button>
+            </div>
+
+            {aiProvider === 'openai' && (
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                  Chave de API da OpenAI (sk-...)
+                </label>
+                <input
+                  type="password"
+                  value={openAiKey}
+                  onChange={(e) => setOpenAiKey(e.target.value)}
+                  placeholder="sk-proj-..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            )}
+
+            {aiProvider === 'gemini' && (
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                  Chave de API do Google Gemini (AIzaSy...)
+                </label>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2">
+              <button
+                onClick={handleSaveKeys}
+                className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5"
+              >
+                {savedSuccess ? <Check className="w-3.5 h-3.5" /> : null}
+                <span>{savedSuccess ? 'Configurações Salvas!' : 'Salvar Configurações'}</span>
+              </button>
+            </div>
+
           </div>
-          <input
-            type="range"
-            min="0.6"
-            max="1.2"
-            step="0.05"
-            value={settings.voiceSpeed}
-            onChange={(e) => handleChange('voiceSpeed', parseFloat(e.target.value))}
-            className="w-full accent-indigo-500"
-          />
-        </div>
 
-        {/* Auto-play Audio Toggle */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-800">
-          <div>
-            <p className="text-xs font-semibold text-white">Reprodução Automática de Áudio</p>
-            <p className="text-[11px] text-slate-400">Tocar voz da IA automaticamente nas respostas</p>
+          {/* Delete Account */}
+          <div className="pt-4 border-t border-slate-100 space-y-2">
+            <h4 className="font-extrabold text-sm text-slate-800">Excluir Conta</h4>
+            <p className="text-xs text-slate-400">
+              Esta ação irá apagar permanentemente sua conta e todos os seus dados.
+            </p>
+            <button
+              onClick={() => {
+                if (confirm('Tem certeza que deseja apagar sua conta?')) {
+                  localStorage.clear();
+                  window.location.reload();
+                }
+              }}
+              className="mt-2 px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+            >
+              Excluir Conta
+            </button>
           </div>
-          <input
-            type="checkbox"
-            checked={settings.autoPlayAudio}
-            onChange={(e) => handleChange('autoPlayAudio', e.target.checked)}
-            className="w-4 h-4 accent-indigo-500 rounded cursor-pointer"
-          />
-        </div>
 
-        {/* Test voice button */}
-        <div className="pt-2">
-          <button
-            onClick={handleTestVoice}
-            className="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-indigo-300 font-bold text-xs flex items-center justify-center gap-2 border border-slate-700 transition-colors"
-          >
-            <Volume2 className="w-4 h-4" />
-            <span>Testar Voz Agora</span>
-          </button>
         </div>
-      </div>
+      )}
+
+      {/* Tab: Assinatura */}
+      {activeTab === 'assinatura' && (
+        <div className="p-6 rounded-2xl border border-sky-100 bg-sky-50/50 space-y-4">
+          <h3 className="font-extrabold text-base text-slate-800">Plano PRO</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Sua assinatura atual permite acesso ilimitado a todos os 13 tutores, aulas práticas e reconhecimento de voz.
+          </p>
+          <div className="font-bold text-sm text-sky-600">Status: Ativo (PRO)</div>
+        </div>
+      )}
+
+      {/* Tab: Ajuda */}
+      {activeTab === 'ajuda' && (
+        <div className="p-6 rounded-2xl border border-slate-100 bg-white space-y-3">
+          <h3 className="font-extrabold text-base text-slate-800">Perguntas Frequentes & Suporte</h3>
+          <p className="text-xs text-slate-500">
+            Dúvidas ou problemas com o microfone? Verifique se deu permissão ao navegador para usar o microfone e selecione seu idioma preferido.
+          </p>
+        </div>
+      )}
 
     </div>
   );

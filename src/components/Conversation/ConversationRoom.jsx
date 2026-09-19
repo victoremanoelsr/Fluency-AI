@@ -1,464 +1,619 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Mic, MicOff, Volume2, Sparkles, ArrowLeft, Send, 
-  BookMarked, Check, ChevronDown, ChevronUp, AlertCircle, 
-  RotateCcw, VolumeX, Lightbulb, Play
+  X, 
+  Volume2, 
+  VolumeX, 
+  Mic, 
+  MicOff, 
+  Maximize2, 
+  FileText, 
+  Keyboard, 
+  Lightbulb, 
+  ArrowUp, 
+  Trash2, 
+  Languages, 
+  Star, 
+  CheckCircle,
+  Clock,
+  MessageSquare,
+  Sparkles
 } from 'lucide-react';
-import { GeminiService } from '../../services/gemini';
-import { speechAudio } from '../../services/speechAudio';
 import { speechRecognition } from '../../services/speechRecognition';
+import { speechAudio } from '../../services/speechAudio';
+import { AIService } from '../../services/aiService';
 import { StorageService } from '../../services/storage';
-import { AudioWave } from '../Common/AudioWave';
-import confetti from 'canvas-confetti';
 
-export const ConversationRoom = ({ scenario, onBack, onOpenApiKey }) => {
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      sender: 'ai',
-      text: scenario.starterPrompt,
-      textPt: scenario.contextPt,
-      userCorrection: null,
-      quickSuggestions: scenario.usefulPhrases.map(p => p.en).slice(0, 3),
-      timestamp: new Date()
-    }
-  ]);
-  const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [interimText, setInterimText] = useState('');
-  const [isAiResponding, setIsAiResponding] = useState(false);
+export const ConversationRoom = ({
+  lesson,
+  tutor,
+  onBack,
+  onCompleteSession
+}) => {
+  // Lesson phase: 'aula' (Phase 1) | 'pratica' (Phase 2)
+  const [phase, setPhase] = useState('aula');
+  const [messages, setMessages] = useState([]);
+  const [translationsVisible, setTranslationsVisible] = useState({});
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-  const [showTranslations, setShowTranslations] = useState({});
-  const [savedPhrases, setSavedPhrases] = useState(new Set());
-  const [showGoals, setShowGoals] = useState(false);
-  const [activeFeedback, setActiveFeedback] = useState(null);
+  
+  // Timer (e.g. starting at 04:46 = 286 seconds)
+  const [timeLeft, setTimeLeft] = useState(286);
 
-  const chatEndRef = useRef(null);
-  const settings = StorageService.getSettings();
+  // Recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [inputMode, setInputMode] = useState('voice'); // 'voice' | 'text'
+  const [textInput, setTextInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Scroll to bottom on new message
+  // Audio controls
+  const [isMuted, setIsMuted] = useState(false);
+
+  // Completion modal state
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [starRating, setStarRating] = useState(5);
+  const [uniqueWordsCount, setUniqueWordsCount] = useState(3);
+  const [sessionStartTime] = useState(Date.now());
+
+  const messagesEndRef = useRef(null);
+  const recordingTimerRef = useRef(null);
+
+  // Countdown timer effect
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isAiResponding, interimText]);
-
-  // Initial speech audio
-  useEffect(() => {
-    if (settings.autoPlayAudio && messages.length === 1) {
-      handleSpeak(scenario.starterPrompt);
-    }
-    return () => {
-      speechAudio.stop();
-      speechRecognition.stopListening();
-    };
+    const timer = setInterval(() => {
+      setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const handleSpeak = (text, rate = settings.voiceSpeed || 0.95) => {
-    speechAudio.speak(text, {
-      rate,
-      onStart: () => setIsAiSpeaking(true),
-      onEnd: () => setIsAiSpeaking(false),
-      onError: () => setIsAiSpeaking(false)
+  const formatTimer = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  // Auto scroll messages
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isProcessing]);
+
+  // Initial greeting from Tutor in Phase 1 (Aula)
+  useEffect(() => {
+    const initialText = lesson.phase1?.intro || `Oi, Victor! Hoje vamos aprender e praticar a aula "${lesson.title}". Pronto para começar?`;
+    const initialMsg = {
+      id: 'msg-init-1',
+      sender: 'ai',
+      text: initialText,
+      translationPt: initialText,
+      timestamp: new Date()
+    };
+    
+    setMessages([initialMsg]);
+
+    // Speak initial intro
+    if (!isMuted) {
+      setIsAiSpeaking(true);
+      speechAudio.speak(initialText, () => setIsAiSpeaking(false));
+    }
+  }, [lesson, tutor]);
+
+  // Recording duration timer
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      setRecordingSeconds(0);
+    }
+    return () => {
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    };
+  }, [isRecording]);
+
+  // Handle Push-to-Talk recording
+  const handleStartRecording = () => {
+    if (isAiSpeaking) speechAudio.stop();
+    setIsRecording(true);
+
+    speechRecognition.startListening({
+      onResult: (transcript, isFinal) => {
+        if (isFinal && transcript.trim()) {
+          handleUserSend(transcript.trim());
+          setIsRecording(false);
+        }
+      },
+      onError: (err) => {
+        console.warn('Speech Recognition error:', err);
+        setIsRecording(false);
+      }
     });
   };
 
-  const toggleListen = () => {
-    if (isListening) {
-      speechRecognition.stopListening();
-      setIsListening(false);
-      setInterimText('');
-    } else {
-      speechAudio.stop();
-      setIsListening(true);
-      setInterimText('');
-
-      speechRecognition.startListening({
-        lang: 'en-US',
-        onInterim: (text) => setInterimText(text),
-        onResult: (finalText) => {
-          setIsListening(false);
-          setInterimText('');
-          if (finalText) {
-            handleSendMessage(finalText);
-          }
-        },
-        onError: (err) => {
-          setIsListening(false);
-          setInterimText('');
-          console.warn('Speech err:', err);
-        },
-        onEnd: () => {
-          setIsListening(false);
-        }
-      });
-    }
+  const handleStopRecordingAndSend = () => {
+    speechRecognition.stopListening();
+    setIsRecording(false);
   };
 
-  const handleSendMessage = async (textToSend) => {
-    const text = (textToSend || inputText).trim();
-    if (!text || isAiResponding) return;
+  const handleCancelRecording = () => {
+    speechRecognition.stopListening();
+    setIsRecording(false);
+  };
 
-    setInputText('');
-    setInterimText('');
+  // Send user message and get AI reply
+  const handleUserSend = async (userText) => {
+    if (!userText.trim()) return;
 
     const userMsg = {
-      id: Date.now().toString(),
+      id: `usr-${Date.now()}`,
       sender: 'user',
-      text: text,
+      text: userText,
       timestamp: new Date()
     };
 
-    const updatedHistory = [...messages, userMsg];
-    setMessages(updatedHistory);
-    setIsAiResponding(true);
+    setMessages(prev => [...prev, userMsg]);
+    setTextInput('');
+    setIsProcessing(true);
+
+    // If we are in Phase 1 and user finishes check question, transition to Phase 2 (Prática)
+    const totalUserMsgs = messages.filter(m => m.sender === 'user').length + 1;
 
     try {
-      const response = await GeminiService.sendConversationMessage({
-        scenario,
-        history: updatedHistory,
-        userMessage: text
+      // Check if should trigger transition to Phase 2 (Prática)
+      if (phase === 'aula' && totalUserMsgs >= 2) {
+        setPhase('pratica');
+        const transitionMsgText = lesson.phase2?.scenarioPrompt || "Vamos praticar agora em uma conversa simples. A conversa começa agora!";
+        
+        setTimeout(() => {
+          const transMsg = {
+            id: `ai-trans-${Date.now()}`,
+            sender: 'ai',
+            text: transitionMsgText,
+            translationPt: "Vamos praticar em uma conversa de situação real.",
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, transMsg]);
+          setIsProcessing(false);
+          if (!isMuted) {
+            setIsAiSpeaking(true);
+            speechAudio.speak(transitionMsgText, () => setIsAiSpeaking(false));
+          }
+        }, 1000);
+        return;
+      }
+
+      const aiResponse = await AIService.sendMessage({
+        lesson,
+        tutor,
+        phase,
+        history: [...messages, userMsg],
+        userMessage: userText
       });
 
+      setIsProcessing(false);
+
       const aiMsg = {
-        id: (Date.now() + 1).toString(),
+        id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: response.reply,
-        textPt: response.replyPt,
-        userCorrection: response.userCorrection?.hasFeedback ? response.userCorrection : null,
-        quickSuggestions: response.quickSuggestions || [],
+        text: aiResponse.text,
+        translationPt: aiResponse.translationPt,
+        correctionPt: aiResponse.correctionPt,
+        isFeedbackReport: aiResponse.isFeedbackReport,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMsg]);
-      setIsAiResponding(false);
 
-      // Trigger streak progress
-      StorageService.updateStreakOnActivity(1);
-
-      // If there's feedback, display it nicely
-      if (response.userCorrection?.hasFeedback) {
-        setActiveFeedback(response.userCorrection);
+      // Speak response
+      if (!isMuted && !aiResponse.isFeedbackReport) {
+        setIsAiSpeaking(true);
+        speechAudio.speak(aiResponse.text, () => setIsAiSpeaking(false));
       }
 
-      // Play AI Audio
-      if (settings.autoPlayAudio) {
-        handleSpeak(response.reply);
+      // If feedback report is returned, complete lesson and show modal
+      if (aiResponse.isFeedbackReport || aiResponse.sessionCompleted) {
+        StorageService.completeLesson(lesson.id);
+        StorageService.updateStreakOnActivity(3, totalUserMsgs);
+        setTimeout(() => {
+          setIsCompletionModalOpen(true);
+        }, 3000);
       }
+
     } catch (err) {
-      setIsAiResponding(false);
-      const errMsg = {
-        id: (Date.now() + 1).toString(),
-        sender: 'ai',
-        text: "I couldn't catch that clearly. Could you try again?",
-        textPt: "Não consegui entender com clareza. Você pode tentar de novo?",
-        error: true,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errMsg]);
+      console.error(err);
+      setIsProcessing(false);
     }
   };
 
-  const handleSaveToVocab = (item) => {
-    StorageService.addVocabularyItem({
-      phrase: item.nativeWay || item.text,
-      meaning: item.whyNative || item.textPt || 'Expressão do dia a dia',
-      nativeForm: item.nativeWay || item.text,
-      example: item.example || scenario.title,
-      category: scenario.category
-    });
-    setSavedPhrases(prev => new Set([...prev, item.text || item.nativeWay]));
-    
-    confetti({
-      particleCount: 25,
-      spread: 40,
-      origin: { y: 0.85 }
-    });
+  // Toggle translation button A/文
+  const toggleTranslation = (msgId) => {
+    setTranslationsVisible(prev => ({
+      ...prev,
+      [msgId]: !prev[msgId]
+    }));
   };
 
-  const toggleTranslation = (id) => {
-    setShowTranslations(prev => ({ ...prev, [id]: !prev[id] }));
+  // Provide inspiration hint
+  const handleInspireHint = () => {
+    const hints = [
+      "Hello! Nice to meet you.",
+      "Good morning, my name is Victor.",
+      "I would like a coffee, please.",
+      "I'm good, how about you?",
+      "Goodbye, have a great day!"
+    ];
+    const picked = hints[Math.floor(Math.random() * hints.length)];
+    setTextInput(picked);
+    setInputMode('text');
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-65px-65px)] max-w-2xl mx-auto w-full">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col select-none overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
       
-      {/* Scenario Header */}
-      <div className="glass-panel border-b border-slate-800/80 p-3.5 flex items-center justify-between shrink-0">
+      {/* Top Controls Bar */}
+      <header className="h-14 px-6 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
+        
+        {/* Left: Phase indicator */}
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-extrabold text-xs">
+            <span className={`w-2 h-2 rounded-full ${phase === 'aula' ? 'bg-amber-500' : 'bg-purple-600'} animate-pulse`}></span>
+            <span>{phase === 'aula' ? 'Aula Interativa' : 'Prática / Conversação'}</span>
+          </div>
+          <span className="text-xs font-bold text-slate-400 hidden sm:inline">
+            {lesson.title}
+          </span>
+        </div>
+
+        {/* Right Action Icons */}
+        <div className="flex items-center gap-3">
+          
+          {/* Countdown timer (04:46) */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 font-mono font-bold text-xs text-slate-700">
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <span>{formatTimer(timeLeft)}</span>
+          </div>
+
+          {/* Notes button */}
           <button 
-            onClick={onBack}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-            title="Voltar aos Cenários"
+            title="Anotações da aula"
+            className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-slate-700 transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <FileText className="w-4 h-4" />
           </button>
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">{scenario.character.avatar}</span>
-            <div>
-              <h2 className="font-bold text-sm text-white flex items-center gap-1.5">
-                {scenario.character.name}
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              </h2>
-              <p className="text-[11px] text-slate-400 truncate max-w-[200px] sm:max-w-xs">{scenario.title}</p>
+
+          {/* Audio Speaker Mute Toggle */}
+          <button
+            onClick={() => {
+              if (isAiSpeaking) speechAudio.stop();
+              setIsMuted(!isMuted);
+            }}
+            title={isMuted ? 'Ativar som do tutor' : 'Silenciar som do tutor'}
+            className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center hover:bg-slate-700 transition-colors"
+          >
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+
+          {/* Close red button */}
+          <button
+            id="btn-close-call"
+            onClick={onBack}
+            className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-colors shadow-xs"
+            title="Encerrar aula"
+          >
+            <X className="w-4 h-4 stroke-[3]" />
+          </button>
+
+        </div>
+
+      </header>
+
+      {/* Main Classroom Screen: 2 Columns */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        
+        {/* Left Video Panel (45%) */}
+        <div className="w-full md:w-[45%] lg:w-[42%] p-4 bg-slate-50 flex flex-col gap-4 border-r border-slate-100 justify-between shrink-0">
+          
+          {/* Top Video: AI Tutor Avatar */}
+          <div className="relative flex-1 rounded-3xl overflow-hidden bg-slate-900 shadow-md border border-slate-800 flex items-center justify-center">
+            
+            <img 
+              src={tutor.avatar} 
+              alt={tutor.name} 
+              className={`w-full h-full object-cover transition-transform duration-700 ${isAiSpeaking ? 'scale-105' : 'scale-100'}`} 
+            />
+
+            {/* Glowing robot chest indicator for Learna-X */}
+            <div className={`absolute top-[68%] left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-cyan-400 shadow-[0_0_20px_#22d3ee] ${isAiSpeaking ? 'animate-ping' : 'opacity-80'}`}></div>
+
+            {/* Stage indicator pill */}
+            <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/10 text-white text-xs font-bold">
+              <span className={`w-2 h-2 rounded-full ${phase === 'aula' ? 'bg-amber-400' : 'bg-purple-400'} animate-pulse`}></span>
+              <span>{phase === 'aula' ? '• Aula' : '• Prática'}</span>
+            </div>
+
+            {/* Tutor Name label */}
+            <div className="absolute bottom-4 left-4 px-3 py-1 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/10 text-white text-xs font-bold">
+              {tutor.name}
+            </div>
+
+            {/* Fullscreen icon */}
+            <button className="absolute top-4 right-4 p-1.5 rounded-full bg-slate-900/60 text-white hover:bg-slate-900 transition-colors">
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+
+          </div>
+
+          {/* Bottom Video: Student Preview */}
+          <div className="relative h-44 rounded-3xl overflow-hidden bg-sky-50/80 border border-sky-100 shadow-xs flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-sky-200 text-sky-700 font-black text-2xl flex items-center justify-center shadow-inner">
+              V
+            </div>
+            <div className="absolute bottom-3 left-4 text-xs font-bold text-slate-500">
+              Victor (Você)
             </div>
           </div>
+
         </div>
 
-        {/* Goals Accordion Toggle */}
-        <button
-          onClick={() => setShowGoals(!showGoals)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/20 transition-colors"
-        >
-          <Lightbulb className="w-3.5 h-3.5 text-indigo-400" />
-          <span className="hidden sm:inline">Objetivos</span>
-          {showGoals ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-        </button>
-      </div>
+        {/* Right Chat & Interactive Stream Panel (55%) */}
+        <div className="flex-1 flex flex-col bg-white overflow-hidden">
+          
+          {/* Phase Banner */}
+          <div className={`px-6 py-2.5 font-extrabold text-xs flex items-center gap-2 ${
+            phase === 'aula' ? 'bg-amber-500 text-white' : 'bg-purple-600 text-white'
+          }`}>
+            <span>{phase === 'aula' ? '🔤 Aula' : '🟣 Prática'}</span>
+            <span className="text-[11px] font-semibold opacity-90">
+              {phase === 'aula' ? 'Aprenda os conceitos e vocabulário' : 'Roleplay em tempo real'}
+            </span>
+          </div>
 
-      {/* Goals Drawer */}
-      {showGoals && (
-        <div className="glass-card bg-indigo-950/40 border-b border-indigo-500/20 p-3.5 text-xs text-indigo-100 animate-fadeIn shrink-0">
-          <p className="font-bold text-indigo-300 mb-1.5 flex items-center gap-1.5">
-            🎯 Seus objetivos nesta conversa real:
-          </p>
-          <ul className="space-y-1 list-disc list-inside text-slate-300">
-            {scenario.goals.map((g, idx) => (
-              <li key={idx}>{g}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+          {/* Message Stream */}
+          <div className="flex-1 p-6 overflow-y-auto space-y-4">
+            {messages.map((msg) => {
+              const isAi = msg.sender === 'ai';
+              const showTrans = translationsVisible[msg.id];
 
-      {/* Chat Messages Feed */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          const isTranslated = showTranslations[msg.id];
-          const isSaved = savedPhrases.has(msg.text);
-
-          return (
-            <div key={msg.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1.5`}>
-              
-              <div className="flex items-end gap-2 max-w-[88%]">
-                {!isUser && (
-                  <span className="text-xl mb-1 shrink-0">{scenario.character.avatar}</span>
-                )}
-
-                <div
-                  className={`relative p-3.5 rounded-2xl ${
-                    isUser
-                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-tr-sm shadow-md shadow-indigo-500/10'
-                      : 'glass-card bg-slate-800/90 text-slate-100 border border-slate-700/60 rounded-tl-sm shadow-sm'
-                  }`}
+              return (
+                <div 
+                  key={msg.id}
+                  className={`flex flex-col ${isAi ? 'items-start' : 'items-end'} group`}
                 >
-                  <p className="text-sm sm:text-base leading-relaxed font-medium">
-                    {msg.text}
-                  </p>
+                  <div className="flex items-start gap-2 max-w-lg">
+                    
+                    {/* Message Bubble */}
+                    <div className={`p-4 rounded-3xl text-sm leading-relaxed ${
+                      isAi 
+                        ? 'bg-slate-100 text-slate-800 rounded-tl-sm' 
+                        : 'bg-sky-500 text-white rounded-tr-sm font-medium'
+                    }`}>
+                      
+                      {/* Formatted body */}
+                      <div className="whitespace-pre-wrap">
+                        {showTrans && msg.translationPt ? msg.translationPt : msg.text}
+                      </div>
 
-                  {/* Translation if toggled */}
-                  {isTranslated && msg.textPt && (
-                    <div className="mt-2 pt-2 border-t border-slate-700/60 text-xs text-indigo-300 italic">
-                      🇧🇷 {msg.textPt}
+                      {/* Gentle Portuguese correction tip if present */}
+                      {msg.correctionPt && (
+                        <div className="mt-2.5 pt-2 border-t border-slate-200/80 text-xs font-semibold text-amber-800 bg-amber-50/80 p-2 rounded-xl">
+                          💡 {msg.correctionPt}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  {/* Message Tools for AI messages */}
-                  {!isUser && (
-                    <div className="mt-2.5 flex items-center gap-3 text-slate-400 text-xs pt-1 border-t border-slate-700/40">
-                      <button
-                        onClick={() => handleSpeak(msg.text)}
-                        className="flex items-center gap-1 hover:text-indigo-300 transition-colors"
-                        title="Ouvir na velocidade normal"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                        <span>Ouvir</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleSpeak(msg.text, 0.72)}
-                        className="flex items-center gap-1 hover:text-indigo-300 transition-colors"
-                        title="Ouvir devagar para treinar o ouvido"
-                      >
-                        <Play className="w-3 h-3 text-amber-400" />
-                        <span className="text-amber-300/90 font-mono">0.7x</span>
-                      </button>
-
+                    {/* Instant Translation Icon A/文 */}
+                    {isAi && (
                       <button
                         onClick={() => toggleTranslation(msg.id)}
-                        className="hover:text-indigo-300 transition-colors ml-auto"
+                        className={`p-1.5 rounded-full border transition-colors shrink-0 mt-1 ${
+                          showTrans 
+                            ? 'bg-sky-500 text-white border-sky-500 shadow-xs' 
+                            : 'bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
+                        title="Alternar tradução"
                       >
-                        {isTranslated ? 'Ocultar' : 'Traduzir'}
+                        <Languages className="w-3.5 h-3.5" />
                       </button>
+                    )}
 
-                      <button
-                        onClick={() => handleSaveToVocab(msg)}
-                        className={`transition-colors ${isSaved ? 'text-emerald-400 font-bold' : 'hover:text-amber-400'}`}
-                        title="Salvar no meu Vocabulário"
-                      >
-                        <BookMarked className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
+              );
+            })}
+
+            {/* Typing / Processing indicator */}
+            {isProcessing && (
+              <div className="flex items-center gap-1.5 p-3 rounded-2xl bg-slate-100 text-slate-400 w-16">
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce"></span>
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:0.2s]"></span>
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce [animation-delay:0.4s]"></span>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Bottom Actions Bar */}
+          <div className="p-4 px-6 border-t border-slate-100 bg-white flex flex-col gap-3 shrink-0">
+            
+            {/* Input field if text mode enabled */}
+            {inputMode === 'text' && (
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUserSend(textInput);
+                }}
+                className="flex items-center gap-2 w-full"
+              >
+                <input
+                  type="text"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="Digite sua resposta em inglês..."
+                  className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:border-sky-500"
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={!textInput.trim()}
+                  className="px-4 py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs disabled:opacity-50"
+                >
+                  Enviar
+                </button>
+              </form>
+            )}
+
+            {/* Bottom Controls Row: Digitar | Push-to-Talk Mic | Inspirar */}
+            <div className="flex items-center justify-between w-full">
+              
+              {/* Digitar (Toggle text mode) */}
+              <button
+                onClick={() => setInputMode(inputMode === 'text' ? 'voice' : 'text')}
+                className={`flex flex-col items-center gap-1 text-[11px] font-bold transition-colors ${
+                  inputMode === 'text' ? 'text-sky-600' : 'text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Keyboard className="w-4 h-4" />
+                </div>
+                <span>Digitar</span>
+              </button>
+
+              {/* Central Audio Recording Button */}
+              {isRecording ? (
+                /* Active Recording State: Green Button with Arrow + Trash + Timer */
+                <div className="flex items-center gap-4">
+                  {/* Cancel / Trash */}
+                  <button
+                    onClick={handleCancelRecording}
+                    className="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center hover:bg-rose-200 transition-colors shadow-xs"
+                    title="Descartar gravação"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+
+                  {/* Send recorded audio */}
+                  <button
+                    onClick={handleStopRecordingAndSend}
+                    className="w-16 h-16 rounded-full bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 active:scale-95 transition-all animate-bounce"
+                    title="Enviar áudio"
+                  >
+                    <ArrowUp className="w-7 h-7 stroke-[3]" />
+                  </button>
+
+                  {/* Recording Timer */}
+                  <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-600">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>{formatTimer(recordingSeconds)}</span>
+                  </div>
+                </div>
+              ) : (
+                /* Normal Mic Button */
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    id="btn-push-to-talk"
+                    onClick={handleStartRecording}
+                    className="w-16 h-16 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center shadow-lg shadow-sky-500/30 active:scale-95 transition-all"
+                    title="Aperte para falar"
+                  >
+                    <Mic className="w-7 h-7" />
+                  </button>
+                  <span className="text-[10px] font-bold text-slate-400">Aperte para falar</span>
+                </div>
+              )}
+
+              {/* Inspirar button */}
+              <button
+                onClick={handleInspireHint}
+                className="flex flex-col items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-sky-600 transition-colors"
+                title="Sugerir frase para falar"
+              >
+                <div className="w-10 h-10 rounded-full bg-sky-50 text-sky-500 flex items-center justify-center">
+                  <Lightbulb className="w-4 h-4" />
+                </div>
+                <span>Inspirar</span>
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* Final Completion Modal */}
+      {isCompletionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 border border-slate-100 text-center space-y-5 animate-fadeIn">
+            
+            {/* Header banner */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white space-y-2">
+              <h3 className="text-base font-black">🏁 Prática finalizada!</h3>
+              <p className="text-xs text-purple-100">O quanto esta prática foi útil para você?</p>
+              <div className="flex justify-center gap-1 pt-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setStarRating(star)}
+                    className="p-1 hover:scale-110 transition-transform"
+                  >
+                    <Star className={`w-5 h-5 ${star <= starRating ? 'text-amber-300 fill-amber-300' : 'text-purple-300'}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3 Metrics Cards */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Palavras únicas</span>
+                <span className="text-sm font-black text-sky-600">{uniqueWordsCount}</span>
               </div>
 
-              {/* Spoken Native Correction Card */}
-              {!isUser && msg.userCorrection && (
-                <div className="ml-7 max-w-[88%] glass-panel bg-amber-950/25 border border-amber-500/30 rounded-2xl p-3 animate-fadeIn text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-400 mb-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Como um americano diria no dia a dia:</span>
-                  </div>
+              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Duração</span>
+                <span className="text-sm font-black text-emerald-600">02:49</span>
+              </div>
 
-                  <div className="flex items-center justify-between bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-amber-500/20 mb-1.5">
-                    <span className="font-semibold text-white text-xs">{msg.userCorrection.nativeWay}</span>
-                    <button
-                      onClick={() => handleSpeak(msg.userCorrection.nativeWay)}
-                      className="p-1 text-amber-400 hover:text-white"
-                      title="Ouvir forma nativa"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
-                    💡 {msg.userCorrection.whyNative}
-                  </p>
-
-                  {msg.userCorrection.slangOrReduction && (
-                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 font-mono text-[10px] border border-amber-500/30">
-                      Redução: {msg.userCorrection.slangOrReduction}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Quick suggestion chips */}
-              {!isUser && msg.quickSuggestions && msg.quickSuggestions.length > 0 && (
-                <div className="ml-7 max-w-[88%] flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider self-center mr-1">Sugestões:</span>
-                  {msg.quickSuggestions.map((sug, sIdx) => (
-                    <button
-                      key={sIdx}
-                      onClick={() => handleSendMessage(sug)}
-                      className="text-[11px] px-2.5 py-1 rounded-full bg-slate-800/80 hover:bg-indigo-600/30 border border-slate-700/60 hover:border-indigo-500/40 text-slate-300 hover:text-white transition-all text-left"
-                    >
-                      "{sug}"
-                    </button>
-                  ))}
-                </div>
-              )}
-
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Total sessões</span>
+                <span className="text-sm font-black text-amber-600">1</span>
+              </div>
             </div>
-          );
-        })}
 
-        {/* AI Typing Indicator */}
-        {isAiResponding && (
-          <div className="flex items-center gap-2 text-slate-400 text-xs py-2 ml-7">
-            <span className="text-xl animate-bounce">{scenario.character.avatar}</span>
-            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse delay-100" />
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse delay-200" />
-              <span className="text-[11px] text-slate-400 ml-1">Respondendo...</span>
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-2">
+              <button
+                id="btn-next-session"
+                onClick={() => {
+                  setIsCompletionModalOpen(false);
+                  onCompleteSession && onCompleteSession();
+                }}
+                className="w-full py-3 rounded-xl bg-sky-500 hover:bg-sky-600 text-white font-extrabold text-xs shadow-md shadow-sky-500/20 transition-all"
+              >
+                Ir para a próxima sessão
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsCompletionModalOpen(false);
+                  onBack();
+                }}
+                className="w-full py-2.5 rounded-xl text-sky-600 font-bold text-xs hover:bg-sky-50 transition-colors"
+              >
+                Ir para a página inicial
+              </button>
             </div>
+
           </div>
-        )}
-
-        {/* Interim Speech Transcription Live */}
-        {interimText && (
-          <div className="flex justify-end">
-            <div className="bg-indigo-950/60 border border-indigo-500/40 text-indigo-200 px-3.5 py-2 rounded-2xl text-xs italic animate-pulse">
-              🎙️ "{interimText}"
-            </div>
-          </div>
-        )}
-
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Spoken Action Bar & Microphone Button */}
-      <div className="glass-panel border-t border-slate-800/80 p-3 shrink-0">
-        <div className="flex items-center gap-2">
-          
-          {/* Main Voice Button */}
-          <button
-            onClick={toggleListen}
-            className={`relative flex items-center justify-center p-3.5 rounded-2xl font-bold transition-all shadow-lg ${
-              isListening
-                ? 'bg-rose-600 text-white shadow-rose-600/50 scale-105 animate-pulse'
-                : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/30'
-            }`}
-            title={isListening ? "Clique para finalizar a fala" : "Pressione para falar em inglês"}
-          >
-            {isListening ? (
-              <MicOff className="w-5 h-5 text-white" />
-            ) : (
-              <Mic className="w-5 h-5 text-white" />
-            )}
-          </button>
-
-          {/* Text Input for typing alternative */}
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder={isListening ? "Ouvindo você falar em inglês..." : "Fale pelo microfone ou digite aqui..."}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700/80 text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-            />
-          </div>
-
-          {/* Send Button */}
-          <button
-            onClick={() => handleSendMessage()}
-            disabled={!inputText.trim() || isAiResponding}
-            className={`p-2.5 rounded-xl transition-all ${
-              inputText.trim() && !isAiResponding
-                ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-md shadow-indigo-600/20'
-                : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-          </button>
         </div>
-
-        {/* Status helper text */}
-        <div className="flex items-center justify-between mt-2 text-[10px] text-slate-500 px-1">
-          <span className="flex items-center gap-1">
-            {isListening ? (
-              <span className="text-rose-400 font-semibold flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-                Ouvindo... Fale sua frase em inglês!
-              </span>
-            ) : isAiSpeaking ? (
-              <span className="text-indigo-400 flex items-center gap-1 font-semibold">
-                <Volume2 className="w-3 h-3 animate-pulse" />
-                {scenario.character.name} falando...
-              </span>
-            ) : (
-              <span>💡 Dica: Toque no microfone e fale naturalmente.</span>
-            )}
-          </span>
-          <button 
-            onClick={() => {
-              setMessages([{
-                id: 'reset',
-                sender: 'ai',
-                text: scenario.starterPrompt,
-                textPt: scenario.contextPt,
-                timestamp: new Date()
-              }]);
-            }}
-            className="flex items-center gap-1 hover:text-slate-300 transition-colors"
-            title="Recomeçar conversa"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Recomeçar</span>
-          </button>
-        </div>
-      </div>
+      )}
 
     </div>
   );

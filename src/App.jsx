@@ -1,120 +1,174 @@
 import React, { useState, useEffect } from 'react';
-import { Navbar } from './components/Layout/Navbar';
-import { BottomBar } from './components/Layout/BottomBar';
-import { HomeDashboard } from './components/Dashboard/HomeDashboard';
-import { ScenariosView } from './components/Conversation/ScenariosView';
-import { ConversationRoom } from './components/Conversation/ConversationRoom';
-import { ShadowingStudio } from './components/Practice/ShadowingStudio';
-import { SlangExplorer } from './components/Slang/SlangExplorer';
-import { VocabularyBank } from './components/Vocabulary/VocabularyBank';
+import { Sidebar } from './components/Layout/Sidebar';
+import { LearningRoadmap } from './components/Dashboard/LearningRoadmap';
+import { LiveTutorCard } from './components/Dashboard/LiveTutorCard';
+import { ProgressView } from './components/Dashboard/ProgressView';
 import { SettingsView } from './components/Settings/SettingsView';
-import { ApiKeyModal } from './components/Common/ApiKeyModal';
+import { ConversationRoom } from './components/Conversation/ConversationRoom';
+import { TutorSelectModal } from './components/Common/TutorSelectModal';
+import { UserProfileModal } from './components/Settings/UserProfileModal';
+import { TUTORS, DEFAULT_TUTOR } from './data/tutors';
+import { ROADMAP_LEVELS, ALL_LESSONS } from './data/lessons';
 import { StorageService } from './services/storage';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState('home');
-  const [activeScenario, setActiveScenario] = useState(null);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [activeTab, setActiveTab] = useState('home'); // 'home' | 'progresso' | 'settings'
+  const [selectedTutor, setSelectedTutor] = useState(DEFAULT_TUTOR);
+  const [activeLesson, setActiveLesson] = useState(null);
+  const [completedLessons, setCompletedLessons] = useState(['say-hello']);
+  const [userProfile, setUserProfile] = useState(StorageService.getUserProfile());
   const [streakInfo, setStreakInfo] = useState(StorageService.getStreakInfo());
 
+  // Modals
+  const [isTutorModalOpen, setIsTutorModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   useEffect(() => {
-    checkApiKey();
+    // Load saved tutor
+    const savedTutorId = StorageService.getSelectedTutorId();
+    const foundTutor = TUTORS.find(t => t.id === savedTutorId);
+    if (foundTutor) setSelectedTutor(foundTutor);
+
+    // Load completed lessons
+    setCompletedLessons(StorageService.getCompletedLessons());
+    setUserProfile(StorageService.getUserProfile());
     setStreakInfo(StorageService.getStreakInfo());
   }, []);
 
-  const checkApiKey = () => {
-    const key = StorageService.getApiKey();
-    setHasApiKey(!!key);
+  const handleSelectTutor = (tutor) => {
+    setSelectedTutor(tutor);
+    StorageService.setSelectedTutorId(tutor.id);
   };
 
-  const handleStartScenario = (scenario) => {
-    setActiveScenario(scenario);
+  const handleStartLesson = (lesson) => {
+    setActiveLesson(lesson);
   };
 
-  const handleBackFromScenario = () => {
-    setActiveScenario(null);
-    setStreakInfo(StorageService.getStreakInfo());
+  const handleStartActiveCall = () => {
+    // Start currently unlocked lesson (e.g. 'how-are-you' or first incomplete)
+    const currentLesson = ALL_LESSONS.find(l => !completedLessons.includes(l.id)) || ALL_LESSONS[1];
+    setActiveLesson(currentLesson);
+  };
+
+  const handleCompleteSession = () => {
+    if (activeLesson) {
+      const updated = StorageService.completeLesson(activeLesson.id);
+      setCompletedLessons(updated);
+      setStreakInfo(StorageService.getStreakInfo());
+
+      // Move to next lesson
+      const currentIndex = ALL_LESSONS.findIndex(l => l.id === activeLesson.id);
+      const nextLesson = ALL_LESSONS[currentIndex + 1];
+      if (nextLesson) {
+        setActiveLesson(nextLesson);
+      } else {
+        setActiveLesson(null);
+      }
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
       
-      {/* Top Navbar */}
-      <Navbar
-        streakInfo={streakInfo}
-        hasApiKey={hasApiKey}
-        onOpenApiKey={() => setIsApiKeyModalOpen(true)}
-        onOpenSettings={() => {
-          setActiveScenario(null);
-          setActiveTab('settings');
-        }}
-      />
-
-      {/* Main Content Area */}
-      <main className="flex-1 w-full overflow-x-hidden">
-        {activeScenario ? (
-          <ConversationRoom
-            scenario={activeScenario}
-            onBack={handleBackFromScenario}
-            onOpenApiKey={() => setIsApiKeyModalOpen(true)}
-          />
-        ) : (
-          <>
-            {activeTab === 'home' && (
-              <HomeDashboard
-                streakInfo={streakInfo}
-                onStartScenario={handleStartScenario}
-                onNavigateTab={(tab) => setActiveTab(tab)}
-                onOpenApiKey={() => setIsApiKeyModalOpen(true)}
-                hasApiKey={hasApiKey}
-              />
-            )}
-
-            {activeTab === 'scenarios' && (
-              <ScenariosView
-                onSelectScenario={handleStartScenario}
-              />
-            )}
-
-            {activeTab === 'shadowing' && (
-              <ShadowingStudio />
-            )}
-
-            {activeTab === 'slang' && (
-              <SlangExplorer />
-            )}
-
-            {activeTab === 'vocab' && (
-              <VocabularyBank />
-            )}
-
-            {activeTab === 'settings' && (
-              <SettingsView
-                hasApiKey={hasApiKey}
-                onOpenApiKey={() => setIsApiKeyModalOpen(true)}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      {/* Bottom Bar (hidden while in full conversation room for maximum screen space) */}
-      {!activeScenario && (
-        <BottomBar
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            setActiveScenario(null);
-            setActiveTab(tab);
+      {/* Full Classroom Call View if a lesson is active */}
+      {activeLesson ? (
+        <ConversationRoom
+          lesson={activeLesson}
+          tutor={selectedTutor}
+          onBack={() => {
+            setActiveLesson(null);
+            setCompletedLessons(StorageService.getCompletedLessons());
+            setStreakInfo(StorageService.getStreakInfo());
           }}
+          onCompleteSession={handleCompleteSession}
         />
+      ) : (
+        /* Main 3-Column Learna AI App Shell */
+        <div className="flex flex-col lg:flex-row min-h-screen w-full">
+          
+          {/* Column 1: Sidebar (20%) */}
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={(tab) => setActiveTab(tab)}
+            profile={userProfile}
+            onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenSettings={() => setActiveTab('settings')}
+            onOpenUpgrade={() => alert('Parabéns! Sua conta PRO com 60% de desconto está ativa nesta demonstração.')}
+          />
+
+          {/* Main Area: Column 2 (50%) + Column 3 (30%) when on Home */}
+          <main className="flex-1 flex flex-col overflow-x-hidden">
+            
+            {activeTab === 'home' && (
+              <div className="flex-1 flex flex-col lg:flex-row">
+                
+                {/* Column 2: Central Roadmap (50%) */}
+                <div className="flex-1 overflow-y-auto bg-slate-50/50 py-4">
+                  {/* Top Bar on Central Column */}
+                  <div className="px-8 py-3 flex items-center justify-between border-b border-slate-100 bg-white/60 backdrop-blur-xs">
+                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
+                      <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                      <span>Início</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-900 text-white font-extrabold text-xs shadow-xs">
+                      <span>👑 PRO</span>
+                    </div>
+                  </div>
+
+                  <LearningRoadmap
+                    completedLessons={completedLessons}
+                    onStartLesson={handleStartLesson}
+                    streakInfo={streakInfo}
+                  />
+                </div>
+
+                {/* Column 3: Live Tutor Card & Video (30%) */}
+                <LiveTutorCard
+                  tutor={selectedTutor}
+                  onOpenTutorModal={() => setIsTutorModalOpen(true)}
+                  onStartCall={handleStartActiveCall}
+                  activeLesson={ALL_LESSONS.find(l => !completedLessons.includes(l.id)) || ALL_LESSONS[1]}
+                />
+
+              </div>
+            )}
+
+            {/* Progresso View */}
+            {activeTab === 'progresso' && (
+              <ProgressView 
+                onSelectCallHistory={(call) => {
+                  const lesson = ALL_LESSONS.find(l => l.id === call.lessonId) || ALL_LESSONS[0];
+                  setActiveLesson(lesson);
+                }}
+              />
+            )}
+
+            {/* Settings View */}
+            {activeTab === 'settings' && (
+              <SettingsView 
+                onBack={() => setActiveTab('home')}
+              />
+            )}
+
+          </main>
+
+        </div>
       )}
 
-      {/* API Key Modal */}
-      <ApiKeyModal
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        onKeySaved={checkApiKey}
+      {/* Tutor Selection Modal */}
+      <TutorSelectModal
+        isOpen={isTutorModalOpen}
+        currentTutor={selectedTutor}
+        onSelectTutor={handleSelectTutor}
+        onClose={() => setIsTutorModalOpen(false)}
+      />
+
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        profile={userProfile}
+        onUpdateProfile={(p) => setUserProfile(p)}
+        onClose={() => setIsProfileModalOpen(false)}
       />
 
     </div>
