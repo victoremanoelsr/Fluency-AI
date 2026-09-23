@@ -22,6 +22,7 @@ import { speechRecognition } from '../../services/speechRecognition';
 import { speechAudio } from '../../services/speechAudio';
 import { AIService } from '../../services/aiService';
 import { StorageService } from '../../services/storage';
+import { PronunciationCard } from './PronunciationCard';
 
 export const ConversationRoom = ({
   lesson,
@@ -83,20 +84,34 @@ export const ConversationRoom = ({
   // Initial greeting from Tutor in Phase 1 (Aula)
   useEffect(() => {
     const initialText = lesson.phase1?.intro || `Oi, Victor! Hoje vamos aprender e praticar a aula "${lesson.title}". Pronto para começar?`;
+    const initialCard = lesson.phase1?.initialCard || null;
     const initialMsg = {
       id: 'msg-init-1',
       sender: 'ai',
       text: initialText,
+      messagePt: initialText,
+      card: initialCard,
       translationPt: initialText,
       timestamp: new Date()
     };
     
     setMessages([initialMsg]);
 
-    // Speak initial intro
+    // Speak initial intro with natural voice
     if (!isMuted) {
       setIsAiSpeaking(true);
-      speechAudio.speak(initialText, () => setIsAiSpeaking(false));
+      if (initialCard?.phraseTarget) {
+        speechAudio.speakBilingual({
+          introPt: initialText,
+          phraseEn: initialCard.phraseTarget,
+          onEnd: () => setIsAiSpeaking(false)
+        });
+      } else {
+        speechAudio.speak(initialText, {
+          lang: 'pt-BR',
+          onEnd: () => setIsAiSpeaking(false)
+        });
+      }
     }
   }, [lesson, tutor]);
 
@@ -200,8 +215,10 @@ export const ConversationRoom = ({
       const aiMsg = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: aiResponse.text,
-        translationPt: aiResponse.translationPt,
+        text: aiResponse.messagePt || aiResponse.text,
+        messagePt: aiResponse.messagePt || aiResponse.text,
+        card: aiResponse.card || null,
+        translationPt: aiResponse.translationPt || aiResponse.messagePt,
         correctionPt: aiResponse.correctionPt,
         isFeedbackReport: aiResponse.isFeedbackReport,
         timestamp: new Date()
@@ -209,10 +226,21 @@ export const ConversationRoom = ({
 
       setMessages(prev => [...prev, aiMsg]);
 
-      // Speak response
+      // Speak response with natural voices
       if (!isMuted && !aiResponse.isFeedbackReport) {
         setIsAiSpeaking(true);
-        speechAudio.speak(aiResponse.text, () => setIsAiSpeaking(false));
+        if (aiResponse.card?.phraseTarget) {
+          speechAudio.speakBilingual({
+            introPt: aiResponse.messagePt || aiResponse.text,
+            phraseEn: aiResponse.card.phraseTarget,
+            onEnd: () => setIsAiSpeaking(false)
+          });
+        } else {
+          speechAudio.speak(aiResponse.messagePt || aiResponse.text, {
+            lang: 'pt-BR',
+            onEnd: () => setIsAiSpeaking(false)
+          });
+        }
       }
 
       // If feedback report is returned, complete lesson and show modal
@@ -402,6 +430,20 @@ export const ConversationRoom = ({
                       {msg.correctionPt && (
                         <div className="mt-2.5 pt-2 border-t border-slate-200/80 text-xs font-semibold text-amber-800 bg-amber-50/80 p-2 rounded-xl">
                           💡 {msg.correctionPt}
+                        </div>
+                      )}
+
+                      {/* Pedagogical 3-Layer Pronunciation Card (Português / Inglês / Pronúncia Vermelha) */}
+                      {isAi && msg.card && (
+                        <div className="mt-3">
+                          <PronunciationCard
+                            cardData={msg.card}
+                            onPracticeClick={(targetPhrase) => {
+                              setTextInput(targetPhrase);
+                              setInputMode('text');
+                              handleStartRecording();
+                            }}
+                          />
                         </div>
                       )}
                     </div>

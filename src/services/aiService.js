@@ -1,4 +1,5 @@
 import { StorageService } from './storage';
+import { getIntuitivePronunciation } from '../utils/phonetics';
 
 export const AIService = {
   /**
@@ -11,36 +12,35 @@ export const AIService = {
 
     const provider = settings.aiProvider || (openAiKey ? 'openai' : geminiKey ? 'gemini' : 'simulated');
 
-    // Build the tailored prompt
+    // Build the tailored prompt focusing on Portuguese tutoring with English target cards
     const systemPrompt = `
-Você é ${tutor.name}, um tutor de inglês particular amigável, carismático e paciente.
+Você é ${tutor.name}, um tutor de inglês particular caloroso, encorajador, carismático e paciente.
 Personalidade: ${tutor.traits.join(', ')}.
-Nacionalidade/Estilo: ${tutor.origin}.
 O aluno chama-se Victor, está no nível [${lesson.level || 'INICIANTE'}] e a aula atual é [${lesson.title} - ${lesson.titlePt}].
-Fase atual da sessão: [${phase === 'aula' ? 'FASE 1: AULA (Instrução e verificação de vocabulário)' : 'FASE 2: PRÁTICA (Roleplay em situação real)'}].
+Fase atual: [${phase === 'aula' ? 'FASE 1: AULA (Instrução de vocabulário e pronúncia)' : 'FASE 2: PRÁTICA (Roleplay em conversa real)'}].
 
-REGRAS OBRIGATÓRIAS:
-1. Mantenha as frases curtas, naturais e fáceis de entender.
-2. Na FASE 1 (AULA): Foque em ensinar, dar exemplos, pedir repetição ou fazer perguntas simples para checar a compreensão.
-3. Na FASE 2 (PRÁTICA/ROLEPLAY): Atue no cenário da aula (${lesson.phase2?.scenarioPrompt || 'conversa casual'}). Seja seu parceiro de diálogo.
-4. CORREÇÃO GRAMATICAL GENTIL: Se o aluno cometer qualquer deslize gramatical ou falar algo não natural, forneça primeiro uma dica acolhedora em português brasileiro explicando a forma mais natural e convide-o a tentar novamente, antes de continuar a simulação em inglês.
-5. Se o aluno finalizar a sessão ou pedir encerramento, retorne um feedback final estruturado com:
-   ---
-   Forças (em português):
-   • [Pontos fortes demonstrados]
-   -----
-   Próximos Passos (em português):
-   • [Dicas de melhoria ou nenhum erro a corrigir]
-   -----
-   Você está pronto para o próximo tópico?
+DIRETRIZES FUNDAMENTAIS DO MÉTODO DE ENSINO:
+1. FALE EM PORTUGUÊS DO BRASIL: Toda a sua conversa com o aluno, explicações, orientações e incentivos DEVEM ser em português natural e acolhedor (ex: "Muito bem, Victor! Vamos aprender agora como se fala...").
+2. FOCO NA FRASE-ALVO: Não despeje blocos de texto em inglês. Em cada turno, você apresenta uma frase clara que o aluno deve aprender e praticar falar em inglês.
+3. ESTRUTURA DO CARD DE PRONÚNCIA: Para toda nova frase ou correção, forneça um card pedagógico com:
+   - phrasePt: O significado em português (ex: "alguém esperando por mim")
+   - phraseTarget: A frase correta no idioma com a gramática natural nativa (ex: "the someone waiting for me")
+   - pronunciationGuide: A pronúncia facilitada e intuitiva em português brasileiro (ex: "de sô-mên vei-tin for maí"), dividindo sílabas por hífen para ser extremamente fácil de ler e falar sem travar.
+   - highlightWord: (opcional) Uma palavra-chave de destaque na frase em inglês.
+4. FEEDBACK AMIGÁVEL: Se o aluno enviou uma resposta ou tentou pronunciar, dê um feedback gentil em português antes de propor a próxima expressão.
 
-Retorne sua resposta em formato JSON:
+Retorne SEMPRE em formato JSON válido:
 {
-  "replyEn": "Texto da sua fala em inglês (ou texto principal)",
-  "replyPt": "Tradução fiel em português brasileiro para o botão de tradução",
-  "correctionPt": "Dica gramatical gentil em português se houve erro (ou null se correto)",
+  "messagePt": "Sua fala amigável de tutor em português brasileiro explicando e convidando o aluno a falar",
+  "card": {
+    "phrasePt": "Significado em português",
+    "phraseTarget": "Frase em inglês gramaticalmente correta",
+    "pronunciationGuide": "Pronúncia abrasileirada e intuitiva separada por hífen",
+    "highlightWord": "palavra de destaque ou null"
+  },
+  "correctionPt": "Feedback ou correção gentil em português se o aluno errou algo (ou null)",
   "isFeedbackReport": false,
-  "readyForNextPhase": false
+  "sessionCompleted": false
 }
 `;
 
@@ -73,7 +73,7 @@ Retorne sua resposta em formato JSON:
     for (const h of recent) {
       messages.push({
         role: h.sender === 'user' ? 'user' : 'assistant',
-        content: h.text
+        content: h.text || h.messagePt || ''
       });
     }
 
@@ -96,11 +96,18 @@ Retorne sua resposta em formato JSON:
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content);
+    
+    // Auto-fill pronunciation guide if missing
+    if (parsed.card && !parsed.card.pronunciationGuide && parsed.card.phraseTarget) {
+      parsed.card.pronunciationGuide = getIntuitivePronunciation(parsed.card.phraseTarget);
+    }
+
     return {
-      text: parsed.replyEn || parsed.replyPt,
-      translationPt: parsed.replyPt,
-      correctionPt: parsed.correctionPt,
-      isFeedbackReport: parsed.isFeedbackReport
+      messagePt: parsed.messagePt || parsed.replyPt || parsed.text,
+      card: parsed.card || null,
+      correctionPt: parsed.correctionPt || null,
+      isFeedbackReport: parsed.isFeedbackReport || false,
+      sessionCompleted: parsed.sessionCompleted || false
     };
   },
 
@@ -110,7 +117,7 @@ Retorne sua resposta em formato JSON:
     for (const h of recent) {
       contents.push({
         role: h.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: h.text }]
+        parts: [{ text: h.text || h.messagePt || '' }]
       });
     }
     contents.push({ role: 'user', parts: [{ text: userMessage }] });
@@ -132,11 +139,17 @@ Retorne sua resposta em formato JSON:
     const data = await res.json();
     const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const parsed = JSON.parse(rawText);
+
+    if (parsed.card && !parsed.card.pronunciationGuide && parsed.card.phraseTarget) {
+      parsed.card.pronunciationGuide = getIntuitivePronunciation(parsed.card.phraseTarget);
+    }
+
     return {
-      text: parsed.replyEn || parsed.replyPt,
-      translationPt: parsed.replyPt,
-      correctionPt: parsed.correctionPt,
-      isFeedbackReport: parsed.isFeedbackReport
+      messagePt: parsed.messagePt || parsed.replyPt || parsed.text,
+      card: parsed.card || null,
+      correctionPt: parsed.correctionPt || null,
+      isFeedbackReport: parsed.isFeedbackReport || false,
+      sessionCompleted: parsed.sessionCompleted || false
     };
   },
 
@@ -144,71 +157,126 @@ Retorne sua resposta em formato JSON:
     const textLower = userMessage.toLowerCase().trim();
 
     // Check if user is saying goodbye or wrapping up
-    if (textLower.includes('goodbye') || textLower.includes('bye') || textLower.includes('tchau') || history.length >= 6) {
+    if (textLower.includes('goodbye') || textLower.includes('bye') || textLower.includes('tchau') || history.length >= 8) {
       return {
-        text: `---
-Forças (em português):
-• Você usou corretamente as saudações e respondeu de forma clara e simples, seguindo o vocabulário ensinado.
------
-Próximos Passos (em português):
-• Nenhum erro a corrigir, parabéns!
------
-Você está pronto para o próximo tópico?`,
-        translationPt: 'Relatório pedagógico de desempenho.',
+        messagePt: `Parabéns, Victor! Concluímos a nossa sessão com sucesso. Você praticou com muita dedicação e sua pronúncia está evoluindo a passos largos!`,
+        card: {
+          phrasePt: 'Até mais! Tenha um ótimo dia!',
+          phraseTarget: 'See you later! Have a great day!',
+          pronunciationGuide: 'síi iú lêi-ter! rrév ê grêit dêi!',
+          highlightWord: 'later'
+        },
         correctionPt: null,
         isFeedbackReport: true,
         sessionCompleted: true
       };
     }
 
-    // Roleplay Coffee simulation
+    // Roleplay Coffee simulation (Cafeteria)
     if (lesson.id === 'ordering-at-cafe') {
       if (textLower.includes('black') || textLower.includes('coffee') || textLower.includes('want')) {
-        if (textLower.includes('want') && !textLower.includes('would like') && !textLower.includes('can i get')) {
-          return {
-            text: "Ótimo esforço! Em inglês, soa muito mais natural e educado dizer 'I would like a black coffee, please' ou 'Can I get a black coffee?'. Vamos tentar de novo? Como você pediria?",
-            translationPt: "Dica de polidez para pedidos em cafeterias.",
-            correctionPt: "Use 'Can I get...' ou 'I would like...' para soar mais educado!",
-            readyForNextPhase: false
-          };
-        }
         return {
-          text: "Perfect! Here is your fresh black coffee. That will be 3 dollars. Cash or card?",
-          translationPt: "Perfeito! Aqui está o seu café preto fresquinho. São 3 dólares. Dinheiro ou cartão?",
+          messagePt: "Excelente escolha, Victor! Para pedir de um jeito muito natural e educado, americanos usam 'Can I get a black coffee, please?'. Veja como fica fácil de ler e pronunciar:",
+          card: {
+            phrasePt: "Posso pegar um café preto, por favor?",
+            phraseTarget: "Can I get a black coffee, please?",
+            pronunciationGuide: "kén ai gét ê blék có-fi, pliis?",
+            highlightWord: "Can I get"
+          },
+          correctionPt: textLower.includes('want') 
+            ? "💡 Dica de ouro: em vez de 'I want', use 'Can I get...'. Soa muito mais educado e nativo!" 
+            : null
+        };
+      }
+
+      return {
+        messagePt: `Olá! Bem-vindo à cafeteria. Vamos aprender agora como pedir um café com leite de forma bem natural em inglês:`,
+        card: {
+          phrasePt: "Eu gostaria de um café com leite, por favor.",
+          phraseTarget: "I would like a latte with oat milk, please.",
+          pronunciationGuide: "ai uúd láik ê lá-tei uiz ôut mílk, pliis.",
+          highlightWord: "would like"
+        },
+        correctionPt: null
+      };
+    }
+
+    // Lição: Say Hello (Cumprimentos)
+    if (lesson.id === 'say-hello') {
+      if (textLower.includes('hello') || textLower.includes('hi') || textLower.includes('oi')) {
+        return {
+          messagePt: "Muito bem, Victor! Agora vamos aprender como perguntar o nome de alguém em uma conversa informal:",
+          card: {
+            phrasePt: "Qual é o seu nome?",
+            phraseTarget: "What is your name?",
+            pronunciationGuide: "uót iz iór nêim?",
+            highlightWord: "name"
+          },
           correctionPt: null
         };
       }
-    }
 
-    // General greetings & How are you
-    if (textLower.includes('hello') || textLower.includes('hi') || textLower.includes('vamos') || textLower.includes('pronto')) {
+      if (textLower.includes('victor') || textLower.includes('my name is')) {
+        return {
+          messagePt: "Isso aí! Soa super natural. Agora veja como se diz 'Prazer em te conhecer' quando você se apresenta para alguém:",
+          card: {
+            phrasePt: "Prazer em conhecer você!",
+            phraseTarget: "Nice to meet you!",
+            pronunciationGuide: "náis tu mít iú!",
+            highlightWord: "meet"
+          },
+          correctionPt: null
+        };
+      }
+
       return {
-        text: "Good morning! What's your name?",
-        translationPt: "Bom dia! Qual é o seu nome?",
+        messagePt: `Oi, Victor! Eu sou o ${tutor.name}, seu tutor. Vamos aprender agora como dizer 'Bom dia' em inglês com a pronúncia perfeita:`,
+        card: {
+          phrasePt: "Bom dia!",
+          phraseTarget: "Good morning!",
+          pronunciationGuide: "gud mór-nin!",
+          highlightWord: "morning"
+        },
         correctionPt: null
       };
     }
 
-    if (textLower.includes('victor') || textLower.includes('my name is')) {
+    // Lição: How Are You?
+    if (lesson.id === 'how-are-you') {
+      if (textLower.includes('good') || textLower.includes('fine') || textLower.includes('bem')) {
+        return {
+          messagePt: "Mandou bem demais! Agora, para devolver a pergunta e manter o papo fluindo, veja como se fala 'E você?':",
+          card: {
+            phrasePt: "Estou bem, e você?",
+            phraseTarget: "I am good, and you?",
+            pronunciationGuide: "ai ém gud, énd iú?",
+            highlightWord: "and you"
+          },
+          correctionPt: null
+        };
+      }
+
       return {
-        text: `Hello, Victor! My name is ${tutor.name}. Goodbye!`,
-        translationPt: `Olá, Victor! Meu nome é ${tutor.name}. Tchau!`,
+        messagePt: "Perfeito, Victor! Quando um amigo te cumprimenta no corredor, ele pergunta 'Como você está?'. Veja como responder:",
+        card: {
+          phrasePt: "Como você está hoje?",
+          phraseTarget: "How are you doing today?",
+          pronunciationGuide: "rráu ár iú dú-in tu-dêi?",
+          highlightWord: "How are you"
+        },
         correctionPt: null
       };
     }
 
-    if (textLower.includes('good') || textLower.includes('fine') || textLower.includes('well')) {
-      return {
-        text: "I'm glad to hear that! Are you ready to practice our conversational dialogue now?",
-        translationPt: "Fico feliz em saber! Está pronto para praticarmos nosso diálogo de conversa agora?",
-        correctionPt: null
-      };
-    }
-
-    // Fallback response
+    // Exemplo genérico / personalizado (inspirado no pedido do usuário)
     return {
-      text: `Great job, Victor! That was very clear. How would you answer: "Nice to meet you"?`,
-      translationPt: "Muito bem, Victor! Foi muito claro. Como você responderia: 'Prazer em te conhecer'?",
+      messagePt: "Vamos aprender agora como falar uma frase muito usada no dia a dia em inglês:",
+      card: {
+        phrasePt: "Alguém esperando por mim",
+        phraseTarget: "the someone waiting for me",
+        pronunciationGuide: "de sô-mên vei-tin for maí",
+        highlightWord: "me"
+      },
       correctionPt: null
     };
   }

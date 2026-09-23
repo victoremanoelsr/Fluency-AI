@@ -14,6 +14,12 @@ export const ROADMAP_LEVELS = [
         phase1: {
           title: 'Cumprimentos Básicos',
           intro: 'Oi, Victor! Hoje vamos aprender a falar cumprimentos em inglês, como dizer "olá", "bom dia" e como perguntar e falar o nome. Pronto para começar?',
+          initialCard: {
+            phrasePt: 'Bom dia! Qual é o seu nome?',
+            phraseTarget: "Good morning! What's your name?",
+            pronunciationGuide: "gud mór-nin! uóts iór nêim?",
+            highlightWord: "name"
+          },
           vocab: [
             { en: 'Hello', pt: 'Olá' },
             { en: 'Good morning', pt: 'Bom dia' },
@@ -44,6 +50,12 @@ export const ROADMAP_LEVELS = [
         phase1: {
           title: 'Perguntando como a pessoa está',
           intro: 'Oi, Victor! Hoje vamos praticar como perguntar e responder "Como você está?" em inglês. Pronto para começar?',
+          initialCard: {
+            phrasePt: 'Estou bem, e você?',
+            phraseTarget: "I'm good, and you?",
+            pronunciationGuide: "aim gud, énd iú?",
+            highlightWord: "and you"
+          },
           vocab: [
             { en: "I'm good.", pt: 'Estou bem (como você se sente).' },
             { en: "You're tired.", pt: 'Você está cansado (falando da outra pessoa).' },
