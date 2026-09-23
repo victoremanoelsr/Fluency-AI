@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Play, Volume2, Sparkles } from 'lucide-react';
+import { ChevronRight, Play, Volume2, Sparkles, MessageSquare, Headphones } from 'lucide-react';
 
 export const LiveTutorCard = ({
   tutor,
@@ -8,36 +8,42 @@ export const LiveTutorCard = ({
   activeLesson
 }) => {
   return (
-    <aside className="w-full lg:w-84 xl:w-96 p-5 border-l border-slate-100 bg-white flex flex-col gap-4 select-none">
+    <aside className="w-full lg:w-84 xl:w-96 p-5 border-l border-slate-100 bg-white flex flex-col gap-4 select-none shrink-0">
       
-      {/* Live Video Preview Box */}
+      {/* Tutor Profile Banner Card */}
       <div className="relative w-full aspect-video rounded-3xl overflow-hidden bg-slate-900 shadow-md border border-slate-800 flex items-center justify-center group">
         
-        {/* Robot/Tutor 3D Avatar Image */}
+        {/* Tutor Portrait Image */}
         <img
-          src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80"
+          src={tutor.avatar}
           alt={tutor.name}
           className="w-full h-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-105"
         />
 
-        {/* Pulsing chest indicator overlay for AI Robot */}
-        <div className="absolute top-[68%] left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-cyan-400/80 shadow-[0_0_15px_#22d3ee] animate-pulse"></div>
+        {/* Gradient dark overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent"></div>
 
-        {/* Timer Badge (04:46) */}
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white font-mono font-bold text-xs border border-white/10 shadow-sm flex items-center gap-1.5">
+        {/* Live Active Pulse Badge */}
+        <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md text-white font-bold text-xs border border-white/10 shadow-sm flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-          <span>04:46</span>
+          <span>Tutor Online</span>
         </div>
 
-        {/* Overlay Play Button to enter full call */}
-        <button
-          id="btn-live-tutor-play"
-          onClick={onStartCall}
-          className="absolute inset-0 m-auto w-12 h-12 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30 flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all opacity-0 group-hover:opacity-100"
-          title="Iniciar Conversa"
-        >
-          <Play className="w-5 h-5 fill-white ml-0.5" />
-        </button>
+        {/* Tutor info at bottom of card */}
+        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+          <div>
+            <h4 className="font-black text-base leading-tight">{tutor.name}</h4>
+            <span className="text-[11px] font-semibold text-slate-300">{tutor.origin} • Fluency AI</span>
+          </div>
+
+          <button
+            onClick={onStartCall}
+            className="w-10 h-10 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-all"
+            title="Iniciar Conversa"
+          >
+            <Play className="w-4 h-4 fill-white ml-0.5" />
+          </button>
+        </div>
 
       </div>
 
@@ -45,10 +51,10 @@ export const LiveTutorCard = ({
       <button
         id="btn-open-tutor-modal"
         onClick={onOpenTutorModal}
-        className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-sky-50/50 hover:bg-sky-50/90 transition-all text-left shadow-xs group"
+        className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 bg-blue-50/50 hover:bg-blue-50/90 transition-all text-left shadow-xs group"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden border border-sky-200 bg-slate-900 shadow-xs shrink-0">
+          <div className="w-11 h-11 rounded-xl overflow-hidden border border-blue-200 bg-slate-900 shadow-xs shrink-0">
             <img 
               src={tutor.avatar} 
               alt={tutor.name} 
@@ -57,10 +63,11 @@ export const LiveTutorCard = ({
           </div>
           <div>
             <div className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              SEU TUTOR
+              Trocar de Tutor
             </div>
             <div className="text-sm font-black text-slate-800 flex items-center gap-1">
               <span>{tutor.name}</span>
+              <span className="text-[11px] font-medium text-slate-500">({tutor.traits[0]})</span>
             </div>
           </div>
         </div>
@@ -68,22 +75,26 @@ export const LiveTutorCard = ({
         <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
       </button>
 
-      {/* Quick Launch Call Banner */}
-      <div className="mt-auto p-4 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-md shadow-blue-500/20">
+      {/* Quick Launch Practice Card */}
+      <div className="mt-auto p-5 rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-600 text-white shadow-xl shadow-blue-600/20 space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-sky-200" />
-          <span className="text-xs font-bold uppercase tracking-wider text-sky-100">Pronto para praticar?</span>
+          <Sparkles className="w-4 h-4 text-yellow-300 fill-yellow-300" />
+          <span className="text-xs font-black uppercase tracking-wider text-blue-100">Pronto para falar?</span>
         </div>
-        <h5 className="font-extrabold text-sm mt-1">Aula: {activeLesson?.title || 'How Are You?'}</h5>
-        <p className="text-xs text-sky-100/80 mt-0.5">
-          Converse por voz com o {tutor.name} e receba feedback em tempo real.
-        </p>
+        
+        <div>
+          <h5 className="font-black text-base">{activeLesson?.title || 'Prática Livre'}</h5>
+          <p className="text-xs text-blue-100/90 mt-1 leading-relaxed">
+            Converse em tempo real com o tutor por áudio ou texto, com correções e fonética facilitada.
+          </p>
+        </div>
+
         <button
           onClick={onStartCall}
-          className="w-full mt-3 py-2.5 px-4 rounded-xl bg-white text-blue-600 font-extrabold text-xs shadow-sm hover:bg-sky-50 transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 rounded-xl bg-white hover:bg-blue-50 text-blue-700 font-black text-xs shadow-md active:scale-95 transition-all flex items-center justify-center gap-2"
         >
-          <Play className="w-3.5 h-3.5 fill-blue-600" />
-          <span>Começar Aula Agora</span>
+          <Headphones className="w-4 h-4 text-blue-600" />
+          <span>Iniciar Sala de Conversação</span>
         </button>
       </div>
 

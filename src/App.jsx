@@ -105,13 +105,13 @@ export function App() {
                 {/* Column 2: Central Roadmap (50%) */}
                 <div className="flex-1 overflow-y-auto bg-slate-50/50 py-4">
                   {/* Top Bar on Central Column */}
-                  <div className="px-8 py-3 flex items-center justify-between border-b border-slate-100 bg-white/60 backdrop-blur-xs">
+                  <div className="px-8 py-3 flex items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-md">
                     <div className="flex items-center gap-2 font-black text-slate-800 text-sm">
-                      <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
-                      <span>Início</span>
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                      <span>Trilha de Conversação Ativa</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-900 text-white font-extrabold text-xs shadow-xs">
-                      <span>👑 PRO</span>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
+                      <span>Fluency AI Studio</span>
                     </div>
                   </div>
 

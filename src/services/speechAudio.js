@@ -1,3 +1,5 @@
+import { StorageService } from './storage';
+
 class SpeechAudioService {
   constructor() {
     this.synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
@@ -5,6 +7,7 @@ class SpeechAudioService {
     this.selectedVoiceEn = null;
     this.selectedVoicePt = null;
     this.isPlaying = false;
+    this.currentAudioElement = null;
     this.onStateChange = null;
 
     if (this.synth) {
@@ -75,6 +78,60 @@ class SpeechAudioService {
   }
 
   /**
+   * Try OpenAI high-fidelity natural neural TTS first if key available
+   */
+  async speakWithOpenAiTTS(text, { voice = 'nova', onStart, onEnd } = {}) {
+    const key = StorageService.getOpenAiKey();
+    if (!key) return false;
+
+    try {
+      this.stop();
+      if (onStart) onStart();
+      this.isPlaying = true;
+      if (this.onStateChange) this.onStateChange(true);
+
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'tts-1',
+          voice: voice, // 'nova' (friendly female), 'alloy' (natural neutral), 'onyx' (deep male)
+          input: text.substring(0, 500)
+        })
+      });
+
+      if (!response.ok) throw new Error('OpenAI TTS failed');
+
+      const blob = await response.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      this.currentAudioElement = audio;
+
+      audio.onended = () => {
+        this.isPlaying = false;
+        if (onEnd) onEnd();
+        if (this.onStateChange) this.onStateChange(false);
+      };
+
+      audio.onerror = () => {
+        this.isPlaying = false;
+        if (onEnd) onEnd();
+        if (this.onStateChange) this.onStateChange(false);
+      };
+
+      await audio.play();
+      return true;
+    } catch (err) {
+      console.warn('OpenAI TTS fallback to WebSpeech:', err);
+      this.isPlaying = false;
+      return false;
+    }
+  }
+
+  /**
    * Speak plain text in a single language ('pt-BR' or 'en-US')
    */
   speak(text, { lang = 'en-US', rate = 0.95, pitch = 1.0, onStart, onEnd, onError } = {}) {
@@ -83,11 +140,14 @@ class SpeechAudioService {
       return;
     }
 
-    this.synth.cancel();
+    this.stop();
 
     if (!text || text.trim() === '') return;
 
-    // Clean markdown and special symbols for natural speech
+    if (!this.selectedVoiceEn || !this.selectedVoicePt) {
+      this.loadVoices();
+    }
+
     const cleanedText = text
       .replace(/[*_~`#[\]]/g, '')
       .replace(/\(.*?\)/g, '')
@@ -95,17 +155,17 @@ class SpeechAudioService {
 
     const utterance = new SpeechSynthesisUtterance(cleanedText);
 
-    // Pick appropriate natural voice
     if (lang.startsWith('pt')) {
       if (this.selectedVoicePt) utterance.voice = this.selectedVoicePt;
       utterance.lang = 'pt-BR';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
     } else {
       if (this.selectedVoiceEn) utterance.voice = this.selectedVoiceEn;
       utterance.lang = 'en-US';
+      utterance.rate = rate;
+      utterance.pitch = pitch;
     }
-
-    utterance.rate = rate;
-    utterance.pitch = pitch;
 
     utterance.onstart = () => {
       this.isPlaying = true;
@@ -135,20 +195,22 @@ class SpeechAudioService {
   speakBilingual({ introPt, phraseEn, onStart, onEnd } = {}) {
     if (!this.synth) return;
 
-    this.synth.cancel();
+    this.stop();
 
     if (!introPt && !phraseEn) return;
 
-    // If only English phrase provided
     if (!introPt && phraseEn) {
       this.speak(phraseEn, { lang: 'en-US', onStart, onEnd });
       return;
     }
 
-    // If only Portuguese intro provided
     if (introPt && !phraseEn) {
       this.speak(introPt, { lang: 'pt-BR', onStart, onEnd });
       return;
+    }
+
+    if (!this.selectedVoiceEn || !this.selectedVoicePt) {
+      this.loadVoices();
     }
 
     this.isPlaying = true;
@@ -167,11 +229,10 @@ class SpeechAudioService {
     const enUtterance = new SpeechSynthesisUtterance(cleanEn);
     if (this.selectedVoiceEn) enUtterance.voice = this.selectedVoiceEn;
     enUtterance.lang = 'en-US';
-    enUtterance.rate = 0.9; // clear, native pronunciation pace
+    enUtterance.rate = 0.88; // cadência clara e natural para o aluno
     enUtterance.pitch = 1.0;
 
     ptUtterance.onend = () => {
-      // Pause slightly between Portuguese explanation and English phrase
       setTimeout(() => {
         if (!this.isPlaying) return;
         this.synth.speak(enUtterance);
@@ -179,7 +240,6 @@ class SpeechAudioService {
     };
 
     ptUtterance.onerror = () => {
-      // Fallback directly to English if error in PT
       if (this.isPlaying) {
         this.synth.speak(enUtterance);
       }
@@ -201,11 +261,15 @@ class SpeechAudioService {
   }
 
   stop() {
+    if (this.currentAudioElement) {
+      this.currentAudioElement.pause();
+      this.currentAudioElement = null;
+    }
     if (this.synth) {
       this.synth.cancel();
-      this.isPlaying = false;
-      if (this.onStateChange) this.onStateChange(false);
     }
+    this.isPlaying = false;
+    if (this.onStateChange) this.onStateChange(false);
   }
 }
 

@@ -79,12 +79,18 @@ export const ROADMAP_LEVELS = [
         id: 'numbers',
         title: 'Numbers',
         titlePt: 'Números e Preços',
-        status: 'locked',
+        status: 'available',
         icon: 'book',
         level: 'Iniciante',
         phase1: {
           title: 'Contando e entendendo valores',
-          intro: 'Vamos aprender a contar de 1 a 20 e entender preços em dólares.',
+          intro: 'Oi, Victor! Vamos aprender agora como perguntar preços e valores em dólares com pronúncia nativa.',
+          initialCard: {
+            phrasePt: 'Quanto custa essa garrafa de água?',
+            phraseTarget: 'How much is that bottle of water?',
+            pronunciationGuide: 'rráu mâtch iz dét bó-tol ov uó-ter?',
+            highlightWord: 'How much'
+          },
           vocab: [
             { en: 'One, Two, Three...', pt: 'Um, Dois, Três...' },
             { en: 'How much is it?', pt: 'Quanto custa isso?' },
@@ -101,12 +107,18 @@ export const ROADMAP_LEVELS = [
         id: 'get-to-know-you',
         title: 'Get to Know You',
         titlePt: 'Conhecendo Você',
-        status: 'locked',
+        status: 'available',
         icon: 'handshake',
         level: 'Iniciante',
         phase1: {
           title: 'Perguntas pessoais simples',
-          intro: 'Aprenda a perguntar de onde a pessoa é e o que ela faz.',
+          intro: 'Oi, Victor! Vamos aprender agora como falar de onde você é e se apresentar para novas pessoas:',
+          initialCard: {
+            phrasePt: 'De onde você é? Eu sou do Brasil.',
+            phraseTarget: "Where are you from? I'm from Brazil.",
+            pronunciationGuide: "uêr ár iú from? aim from bra-zíu.",
+            highlightWord: "Where are you from"
+          },
           vocab: [
             { en: 'Where are you from?', pt: 'De onde você é?' },
             { en: "I'm from Brazil.", pt: 'Eu sou do Brasil.' }
@@ -122,12 +134,18 @@ export const ROADMAP_LEVELS = [
         id: 'ordering-at-cafe',
         title: 'Ordering at a Café',
         titlePt: 'Pedindo em um Café',
-        status: 'locked',
+        status: 'available',
         icon: 'coffee',
         level: 'Iniciante',
         phase1: {
           title: 'Fazendo pedidos com educação',
-          intro: 'Aprenda a pedir comida e café de forma natural usando "Can I get..." ou "I would like...".',
+          intro: 'Oi, Victor! Vamos aprender agora como pedir comida e bebida de um jeito super educado e natural em inglês:',
+          initialCard: {
+            phrasePt: 'Posso pedir um café preto, por favor?',
+            phraseTarget: 'Can I get a black coffee, please?',
+            pronunciationGuide: 'kén ai gét ê blék có-fi, pliis?',
+            highlightWord: 'Can I get'
+          },
           vocab: [
             { en: 'Can I get a black coffee?', pt: 'Me vê um café preto?' },
             { en: 'For here or to go?', pt: 'Para consumir aqui ou para viagem?' },
