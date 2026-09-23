@@ -91,7 +91,7 @@ export function App() {
             activeTab={activeTab}
             onTabChange={(tab) => setActiveTab(tab)}
             profile={userProfile}
-            onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenProfile={() => setIsProfileModalOpen(true)}
             onOpenSettings={() => setActiveTab('settings')}
             onOpenUpgrade={() => alert('Parabéns! Sua conta PRO com 60% de desconto está ativa nesta demonstração.')}
           />
