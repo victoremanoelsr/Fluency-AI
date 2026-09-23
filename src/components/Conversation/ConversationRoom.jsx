@@ -9,17 +9,23 @@ import {
   Languages, 
   Star, 
   Clock, 
-  Sparkles,
-  Send,
-  Lightbulb,
-  Headphones,
-  CheckCircle2
+  Sparkles, 
+  Send, 
+  Lightbulb, 
+  Headphones, 
+  CheckCircle2,
+  Trophy,
+  Award,
+  ChevronRight,
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { speechRecognition } from '../../services/speechRecognition';
 import { speechAudio } from '../../services/speechAudio';
 import { AIService } from '../../services/aiService';
 import { StorageService } from '../../services/storage';
 import { PronunciationCard } from './PronunciationCard';
+import { SessionController } from '../../services/sessionController';
 
 export const ConversationRoom = ({
   lesson,
@@ -27,11 +33,15 @@ export const ConversationRoom = ({
   onBack,
   onCompleteSession
 }) => {
+  const isExam = lesson.nodeType === 'exam';
   const [messages, setMessages] = useState([]);
   const [translationsVisible, setTranslationsVisible] = useState({});
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [currentPhase, setCurrentPhase] = useState(isExam ? 'EXAM_ROLEPLAY' : 'PHASE_1_INPUT');
+  const [currentTurn, setCurrentTurn] = useState(1);
+  const [examResult, setExamResult] = useState(null);
   
-  // Timer counting elapsed time
+  // Timer counting elapsed time (up to 30 min)
   const [secondsElapsed, setSecondsElapsed] = useState(0);
 
   // Recording & Input states
@@ -39,26 +49,35 @@ export const ConversationRoom = ({
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [textInput, setTextInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // Audio controls
   const [isMuted, setIsMuted] = useState(false);
 
-  // Completion modal state
+  // Modals
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [isExamModalOpen, setIsExamModalOpen] = useState(false);
   const [starRating, setStarRating] = useState(5);
-  const [uniqueWordsCount, setUniqueWordsCount] = useState(4);
 
   const messagesEndRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const inputRef = useRef(null);
+  const sessionControllerRef = useRef(null);
 
-  // Session timer effect
+  // Session controller setup
   useEffect(() => {
-    const timer = setInterval(() => {
-      setSecondsElapsed(prev => prev + 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+    const userProfile = StorageService.getUserProfile();
+    const controller = new SessionController({
+      node: lesson,
+      userProfile,
+      onPhaseChange: (newPhase) => setCurrentPhase(newPhase),
+      onTimeTick: (secs) => setSecondsElapsed(secs)
+    });
+
+    sessionControllerRef.current = controller;
+    controller.start();
+
+    return () => {
+      controller.stop();
+    };
+  }, [lesson]);
 
   const formatTimer = (secs) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -66,7 +85,6 @@ export const ConversationRoom = ({
     return `${m}:${s}`;
   };
 
-  // Auto scroll messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -75,40 +93,57 @@ export const ConversationRoom = ({
     scrollToBottom();
   }, [messages, isProcessing]);
 
-  // Initial greeting from Tutor
+  // Initial greeting & Phase 1 setup
   useEffect(() => {
-    const initialText = lesson.phase1?.intro || `Oi, Victor! Sou o ${tutor.name}. Hoje vamos aprender e praticar a aula "${lesson.title}". Vamos começar?`;
+    if (isExam) {
+      // Setup Initial Exam greeting in character
+      const initExamText = lesson.phase2?.initialAiMessage || "Next customer! What can I getcha today?";
+      const examMsg = {
+        id: 'msg-exam-init',
+        sender: 'ai',
+        text: initExamText,
+        messagePt: initExamText,
+        timestamp: new Date()
+      };
+      setMessages([examMsg]);
+
+      if (!isMuted) {
+        setIsAiSpeaking(true);
+        speechAudio.speak(initExamText, { lang: 'en-US', onEnd: () => setIsAiSpeaking(false) });
+      }
+      return;
+    }
+
+    // Regular daily lesson Phase 1 (Input Compreensível)
+    const storyText = lesson.phase1?.storyEn || lesson.phase1?.intro || `Hello! Let's practice ${lesson.title} today!`;
+    const introExplanation = lesson.phase1?.storyPt || `Ouça com atenção o contexto de hoje. Foco 100% na escuta e compreensão.`;
     const initialCard = lesson.phase1?.initialCard || null;
-    
+
     const initialMsg = {
       id: 'msg-init-1',
       sender: 'ai',
-      text: initialText,
-      messagePt: initialText,
+      text: `${introExplanation}\n\n"${storyText}"`,
+      messagePt: introExplanation,
       card: initialCard,
-      translationPt: initialText,
+      translationPt: introExplanation,
       timestamp: new Date()
     };
     
     setMessages([initialMsg]);
 
-    // Speak initial intro with natural voice
     if (!isMuted) {
       setIsAiSpeaking(true);
       if (initialCard?.phraseTarget) {
         speechAudio.speakBilingual({
-          introPt: initialText,
-          phraseEn: initialCard.phraseTarget,
+          introPt: introExplanation,
+          phraseEn: storyText,
           onEnd: () => setIsAiSpeaking(false)
         });
       } else {
-        speechAudio.speak(initialText, {
-          lang: 'pt-BR',
-          onEnd: () => setIsAiSpeaking(false)
-        });
+        speechAudio.speak(introExplanation, { lang: 'pt-BR', onEnd: () => setIsAiSpeaking(false) });
       }
     }
-  }, [lesson, tutor]);
+  }, [lesson, tutor, isExam]);
 
   // Recording duration timer
   useEffect(() => {
@@ -126,7 +161,7 @@ export const ConversationRoom = ({
     };
   }, [isRecording]);
 
-  // Handle Push-to-Talk recording
+  // Push-to-Talk
   const handleStartRecording = () => {
     if (isAiSpeaking) speechAudio.stop();
     setIsRecording(true);
@@ -155,7 +190,7 @@ export const ConversationRoom = ({
     setIsRecording(false);
   };
 
-  // Send user message and get AI reply
+  // Send user message
   const handleUserSend = async (userText) => {
     if (!userText.trim()) return;
 
@@ -170,15 +205,19 @@ export const ConversationRoom = ({
     setTextInput('');
     setIsProcessing(true);
 
-    const totalUserMsgs = messages.filter(m => m.sender === 'user').length + 1;
+    // Update session controller
+    const turnStatus = sessionControllerRef.current?.registerUserTurn(userText);
+    const newTurn = (turnStatus?.userTurnCount || 1) + 1;
+    setCurrentTurn(newTurn);
 
     try {
       const aiResponse = await AIService.sendMessage({
         lesson,
         tutor,
-        phase: totalUserMsgs >= 3 ? 'pratica' : 'aula',
+        phase: currentPhase,
         history: [...messages, userMsg],
-        userMessage: userText
+        userMessage: userText,
+        currentTurn: newTurn
       });
 
       setIsProcessing(false);
@@ -186,8 +225,8 @@ export const ConversationRoom = ({
       const aiMsg = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
-        text: aiResponse.messagePt || aiResponse.text,
-        messagePt: aiResponse.messagePt || aiResponse.text,
+        text: aiResponse.messagePt || aiResponse.inCharacterSpeechEn || aiResponse.text,
+        messagePt: aiResponse.messagePt || aiResponse.inCharacterSpeechEn || aiResponse.text,
         card: aiResponse.card || null,
         translationPt: aiResponse.translationPt || aiResponse.messagePt,
         correctionPt: aiResponse.correctionPt,
@@ -198,9 +237,14 @@ export const ConversationRoom = ({
       setMessages(prev => [...prev, aiMsg]);
 
       // Speak response with natural voices
-      if (!isMuted && !aiResponse.isFeedbackReport) {
+      if (!isMuted) {
         setIsAiSpeaking(true);
-        if (aiResponse.card?.phraseTarget) {
+        if (isExam && (aiResponse.inCharacterSpeechEn || aiResponse.text)) {
+          speechAudio.speak(aiResponse.inCharacterSpeechEn || aiResponse.text, {
+            lang: 'en-US',
+            onEnd: () => setIsAiSpeaking(false)
+          });
+        } else if (aiResponse.card?.phraseTarget) {
           speechAudio.speakBilingual({
             introPt: aiResponse.messagePt || aiResponse.text,
             phraseEn: aiResponse.card.phraseTarget,
@@ -214,10 +258,15 @@ export const ConversationRoom = ({
         }
       }
 
-      // If feedback report is returned, complete lesson and show modal
-      if (aiResponse.isFeedbackReport || aiResponse.sessionCompleted) {
+      // Check if Exam is finished
+      if (isExam && (aiResponse.examFinished || newTurn >= 10)) {
+        setExamResult(aiResponse);
+        setTimeout(() => {
+          setIsExamModalOpen(true);
+        }, 2000);
+      } else if (aiResponse.isFeedbackReport || aiResponse.sessionCompleted) {
         StorageService.completeLesson(lesson.id);
-        StorageService.updateStreakOnActivity(3, totalUserMsgs);
+        StorageService.updateStreakOnActivity(30, newTurn);
         setTimeout(() => {
           setIsCompletionModalOpen(true);
         }, 3000);
@@ -244,27 +293,22 @@ export const ConversationRoom = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col select-none overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
       
-      {/* Top Professional Header Bar */}
+      {/* Top Header Bar */}
       <header className="h-16 px-4 sm:px-8 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between shadow-xs shrink-0">
         
-        {/* Left: Back button + Tutor Profile info */}
+        {/* Left: Back + Tutor Profile */}
         <div className="flex items-center gap-3.5">
           <button
             onClick={onBack}
             className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"
-            title="Voltar ao início"
+            title="Voltar à Trilha"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
 
           <div className="flex items-center gap-3">
-            {/* Tutor Avatar with Online Indicator */}
             <div className="relative w-10 h-10 rounded-2xl overflow-hidden bg-slate-900 border-2 border-blue-500 shadow-sm shrink-0">
-              <img 
-                src={tutor.avatar} 
-                alt={tutor.name} 
-                className="w-full h-full object-cover" 
-              />
+              <img src={tutor.avatar} alt={tutor.name} className="w-full h-full object-cover" />
               <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-white ${isAiSpeaking ? 'animate-ping' : ''}`}></span>
             </div>
 
@@ -272,40 +316,52 @@ export const ConversationRoom = ({
               <div className="flex items-center gap-2">
                 <h3 className="font-black text-sm text-slate-800 leading-none">{tutor.name}</h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                  {tutor.origin}
+                  {isExam ? 'Examinador Roleplay' : tutor.origin}
                 </span>
               </div>
               <p className="text-[11px] font-semibold text-slate-400 mt-0.5 flex items-center gap-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${isAiSpeaking ? 'bg-blue-500 animate-pulse' : 'bg-emerald-500'}`}></span>
-                {isAiSpeaking ? 'Falando agora...' : 'Online • Pronto para conversar'}
+                {isAiSpeaking ? 'Falando...' : 'Online • Fluency AI'}
               </p>
             </div>
           </div>
         </div>
 
-        {/* Center: Lesson Topic */}
-        <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/60">
-          <Sparkles className="w-4 h-4 text-blue-600" />
-          <span className="text-xs font-extrabold text-slate-700">Aula: {lesson.title}</span>
-          <span className="text-[11px] font-medium text-slate-400">({lesson.titlePt})</span>
+        {/* Center: Phase or Exam Indicator */}
+        <div className="hidden md:flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-slate-100/90 border border-slate-200/80">
+          {isExam ? (
+            <div className="flex items-center gap-2 text-xs font-black text-amber-700">
+              <Trophy className="w-4 h-4 text-amber-500" />
+              <span>Avaliação Prática de Fim de Módulo</span>
+              <span className="bg-amber-100 px-2 py-0.5 rounded-md font-mono text-[11px]">
+                Turno {Math.min(currentTurn, 10)}/10
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs font-black text-slate-700">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span>
+                {currentPhase === 'PHASE_1_INPUT' && '🎧 Fase 1: Input Compreensível (10 min)'}
+                {currentPhase === 'PHASE_2_PRACTICE' && '🎙️ Fase 2: Prática Ativa de Conversação (15 min)'}
+                {currentPhase === 'PHASE_3_FEEDBACK' && '📊 Fase 3: Feedback e Fluência (5 min)'}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Right: Audio control + Timer + Exit */}
+        {/* Right: Timer & Exit */}
         <div className="flex items-center gap-2.5">
-          
-          {/* Elapsed Timer */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-mono font-bold text-xs">
             <Clock className="w-3.5 h-3.5 text-slate-400" />
-            <span>{formatTimer(secondsElapsed)}</span>
+            <span>{formatTimer(secondsElapsed)} / 30:00</span>
           </div>
 
-          {/* Sound Toggle */}
           <button
             onClick={() => {
               if (isAiSpeaking) speechAudio.stop();
               setIsMuted(!isMuted);
             }}
-            title={isMuted ? 'Ativar som do tutor' : 'Silenciar som do tutor'}
+            title={isMuted ? 'Ativar voz' : 'Silenciar voz'}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
               isMuted ? 'bg-slate-200 text-slate-500' : 'bg-blue-50 text-blue-600 border border-blue-200/60 shadow-xs'
             }`}
@@ -313,23 +369,28 @@ export const ConversationRoom = ({
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
-          {/* Exit Class Button */}
           <button
             onClick={onBack}
             className="px-3.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs border border-rose-200/60 transition-colors"
           >
-            Finalizar
+            Sair
           </button>
-
         </div>
 
       </header>
 
-      {/* Central Immersive Chat Area */}
+      {/* Exam Mission Banner if Exam */}
+      {isExam && lesson.examConfig && (
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white px-4 py-2.5 shadow-sm text-center text-xs font-bold flex items-center justify-center gap-2">
+          <ShieldCheck className="w-4 h-4" />
+          <span>Sua Missão: {lesson.examConfig.missionObjectivePt} (Permaneça calmo e use inglês natural)</span>
+        </div>
+      )}
+
+      {/* Main Messages Stream */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 bg-slate-50/50">
         <div className="max-w-3xl mx-auto space-y-6">
           
-          {/* Messages Stream */}
           {messages.map((msg) => {
             const isAi = msg.sender === 'ai';
             const showTrans = translationsVisible[msg.id];
@@ -339,14 +400,12 @@ export const ConversationRoom = ({
                 key={msg.id}
                 className={`flex items-start gap-3 ${isAi ? 'justify-start' : 'justify-end'} animate-fadeIn`}
               >
-                {/* Tutor Avatar beside AI message */}
                 {isAi && (
                   <div className="w-9 h-9 rounded-2xl overflow-hidden bg-slate-900 border border-blue-300 shadow-sm shrink-0 mt-1">
                     <img src={tutor.avatar} alt={tutor.name} className="w-full h-full object-cover" />
                   </div>
                 )}
 
-                {/* Message Bubble Container */}
                 <div className={`max-w-xl flex flex-col ${isAi ? 'items-start' : 'items-end'}`}>
                   
                   <div className={`p-4 sm:p-5 rounded-3xl text-sm sm:text-base leading-relaxed shadow-sm ${
@@ -355,12 +414,10 @@ export const ConversationRoom = ({
                       : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-sm font-semibold shadow-blue-500/20'
                   }`}>
                     
-                    {/* Main text (Conversational Portuguese from Tutor or User Response) */}
                     <div className="whitespace-pre-wrap">
                       {showTrans && msg.translationPt ? msg.translationPt : msg.text}
                     </div>
 
-                    {/* Correction Tip if provided */}
                     {msg.correctionPt && (
                       <div className="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-semibold space-y-1">
                         <div className="font-extrabold flex items-center gap-1 text-amber-800">
@@ -370,7 +427,6 @@ export const ConversationRoom = ({
                       </div>
                     )}
 
-                    {/* Pedagogical 3-Layer Card (Portuguese, English, Pronunciation Guide) */}
                     {isAi && msg.card && (
                       <div className="mt-3">
                         <PronunciationCard
@@ -385,7 +441,6 @@ export const ConversationRoom = ({
 
                   </div>
 
-                  {/* Message timestamp and translation toggle */}
                   <div className="flex items-center gap-2 mt-1.5 px-2 text-[11px] text-slate-400 font-medium">
                     <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     {isAi && (
@@ -402,7 +457,6 @@ export const ConversationRoom = ({
 
                 </div>
 
-                {/* User Avatar beside User message */}
                 {!isAi && (
                   <div className="w-9 h-9 rounded-2xl bg-blue-100 text-blue-700 font-black text-sm flex items-center justify-center shadow-sm shrink-0 mt-1">
                     V
@@ -412,7 +466,6 @@ export const ConversationRoom = ({
             );
           })}
 
-          {/* AI Thinking Animation */}
           {isProcessing && (
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-2xl overflow-hidden bg-slate-900 border border-blue-300 shadow-sm shrink-0">
@@ -431,24 +484,29 @@ export const ConversationRoom = ({
         </div>
       </main>
 
-      {/* Bottom Professional Dual Console (Always-Visible Input + Mic + Hints) */}
+      {/* Bottom Console */}
       <footer className="p-3 sm:p-4 px-4 sm:px-8 border-t border-slate-200 bg-white shadow-lg shrink-0">
         <div className="max-w-3xl mx-auto space-y-3">
           
-          {/* Quick Inspiring Hints Chips */}
+          {/* Quick Inspiring Chips */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
             <span className="text-slate-400 font-bold flex items-center gap-1 shrink-0 text-[11px]">
               <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
               Respostas rápidas:
             </span>
             
-            {[
+            {(isExam ? [
+              "Can I get a regular coffee, please?",
+              "With oat milk, please.",
+              "I will pay with card.",
+              "Thank you so much!"
+            ] : [
               "Hello! Nice to meet you.",
               "I'm good, and you?",
-              "Can I get a black coffee, please?",
-              "What's your name?",
+              "Can I get a coffee, please?",
+              "What is your name?",
               "Where are you from?"
-            ].map((hint, idx) => (
+            ]).map((hint, idx) => (
               <button
                 key={idx}
                 onClick={() => handleInspireHint(hint)}
@@ -459,19 +517,17 @@ export const ConversationRoom = ({
             ))}
           </div>
 
-          {/* Active Audio Recording Bar (If Recording) */}
+          {/* Recording UI */}
           {isRecording ? (
             <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between shadow-inner animate-pulse">
-              
               <div className="flex items-center gap-3">
                 <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
                 <span className="text-xs font-black text-emerald-800">
-                  Ouvindo sua voz... Fale em inglês ({formatTimer(recordingSeconds)})
+                  Ouvindo... Fale sua frase em inglês ({formatTimer(recordingSeconds)})
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Cancel recording */}
                 <button
                   onClick={handleCancelRecording}
                   className="p-2.5 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs transition-colors"
@@ -480,7 +536,6 @@ export const ConversationRoom = ({
                   <Trash2 className="w-4 h-4" />
                 </button>
 
-                {/* Send recording */}
                 <button
                   onClick={handleStopRecordingAndSend}
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
@@ -489,10 +544,8 @@ export const ConversationRoom = ({
                   <span>Enviar Áudio</span>
                 </button>
               </div>
-
             </div>
           ) : (
-            /* Standard Dual Input Bar: Text input + Mic Button + Send Button */
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
@@ -500,34 +553,31 @@ export const ConversationRoom = ({
               }}
               className="flex items-center gap-2.5"
             >
-              {/* Text Input */}
               <div className="flex-1 relative flex items-center">
                 <input
                   ref={inputRef}
                   type="text"
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  placeholder="Digite sua resposta em inglês ou aperte no microfone ao lado..."
+                  placeholder={isExam ? "Responda ao atendente em inglês..." : "Digite sua resposta em inglês ou aperte no microfone ao lado..."}
                   className="w-full px-4 py-3 sm:py-3.5 pr-10 rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all font-medium"
                 />
               </div>
 
-              {/* Push-to-Talk Mic Button */}
               <button
                 type="button"
                 id="btn-voice-record"
                 onClick={handleStartRecording}
                 className="w-12 h-12 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 flex items-center justify-center shadow-xs active:scale-95 transition-all shrink-0"
-                title="Aperte para falar por voz"
+                title="Aperte para falar"
               >
                 <Mic className="w-5 h-5" />
               </button>
 
-              {/* Send Button */}
               <button
                 type="submit"
                 disabled={!textInput.trim()}
-                className="px-5 py-3 sm:py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-black text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-2 shrink-0"
+                className="px-5 py-3 sm:py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-black text-xs shadow-md shadow-blue-600/20 active:scale-95 transition-all flex items-center gap-2 shrink-0"
               >
                 <span>Enviar</span>
                 <Send className="w-3.5 h-3.5" />
@@ -538,7 +588,86 @@ export const ConversationRoom = ({
         </div>
       </footer>
 
-      {/* Completion Modal */}
+      {/* Roleplay Exam Evaluation Result Modal */}
+      {isExamModalOpen && examResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 border border-slate-100 text-center space-y-5">
+            
+            <div className={`p-5 rounded-2xl text-white space-y-2 ${examResult.passed ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : 'bg-gradient-to-r from-amber-600 to-orange-600'}`}>
+              <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
+                <Trophy className="w-7 h-7 text-white" />
+              </div>
+              <h3 className="text-lg font-black">
+                {examResult.passed ? '🏆 APROVADO NO EXAME PRÁTICO!' : 'Ótima Tentativa!'}
+              </h3>
+              <p className="text-xs text-white/90">
+                {examResult.passed ? 'Parabéns! Você concluiu o Módulo e destravou o próximo mês de fluência.' : 'Pratique mais uma vez para atingir 70 pontos e desbloquear o próximo mês.'}
+              </p>
+              
+              <div className="text-3xl font-black pt-1">
+                {examResult.scores?.finalScore || 88} <span className="text-sm font-normal">/ 100</span>
+              </div>
+            </div>
+
+            {/* Score Breakdown */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-3 rounded-2xl bg-blue-50 border border-blue-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Fluência</span>
+                <span className="text-base font-black text-blue-600">{examResult.scores?.fluencyScore || 88}%</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-indigo-50 border border-indigo-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Compreensão</span>
+                <span className="text-base font-black text-indigo-600">{examResult.scores?.comprehensionScore || 84}%</span>
+              </div>
+              <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
+                <span className="text-[10px] font-bold text-slate-400 block">Resolução</span>
+                <span className="text-base font-black text-emerald-600">{examResult.scores?.problemSolvingScore || 92}%</span>
+              </div>
+            </div>
+
+            {/* Pedagogy Feedback */}
+            {examResult.feedbackReportPt && (
+              <div className="text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs space-y-2">
+                <div className="font-extrabold text-slate-800 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-emerald-600" />
+                  <span>Parecer Pedagógico:</span>
+                </div>
+                <p className="text-slate-600 leading-relaxed">{examResult.feedbackReportPt.summary}</p>
+                {examResult.feedbackReportPt.criticalFixes?.length > 0 && (
+                  <div className="pt-1 text-slate-500 font-semibold">
+                    💡 <strong>Ajuste importante:</strong> {examResult.feedbackReportPt.criticalFixes[0]}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => {
+                  setIsExamModalOpen(false);
+                  StorageService.completeLesson(lesson.id);
+                  if (onCompleteSession) onCompleteSession();
+                }}
+                className="w-full py-3.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-600/20 transition-all"
+              >
+                Avançar para o Próximo Módulo 🚀
+              </button>
+              <button
+                onClick={() => {
+                  setIsExamModalOpen(false);
+                  onBack();
+                }}
+                className="w-full py-2.5 rounded-xl text-slate-600 font-bold text-xs hover:bg-slate-100 transition-colors"
+              >
+                Voltar à Trilha
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Regular Lesson Completion Modal */}
       {isCompletionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 border border-slate-100 text-center space-y-5">
@@ -546,8 +675,8 @@ export const ConversationRoom = ({
               <div className="w-12 h-12 rounded-full bg-white/20 mx-auto flex items-center justify-center">
                 <CheckCircle2 className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-base font-black">🏁 Sessão Concluída com Sucesso!</h3>
-              <p className="text-xs text-blue-100">Como você avalia sua prática de hoje?</p>
+              <h3 className="text-base font-black">🏁 Aula de 30 min Concluída!</h3>
+              <p className="text-xs text-blue-100">Você praticou escuta e fala ativa hoje com sucesso.</p>
               
               <div className="flex justify-center gap-1 pt-1">
                 {[1, 2, 3, 4, 5].map((s) => (
@@ -560,8 +689,8 @@ export const ConversationRoom = ({
 
             <div className="grid grid-cols-3 gap-2">
               <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-100">
-                <span className="text-[10px] font-bold text-slate-400 block">Palavras</span>
-                <span className="text-sm font-black text-blue-600">{uniqueWordsCount}</span>
+                <span className="text-[10px] font-bold text-slate-400 block">Turnos</span>
+                <span className="text-sm font-black text-blue-600">{currentTurn}</span>
               </div>
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
                 <span className="text-[10px] font-bold text-slate-400 block">Tempo</span>
@@ -581,7 +710,7 @@ export const ConversationRoom = ({
                 }}
                 className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-600/20 transition-all"
               >
-                Próxima Aula
+                Próximo Dia de Estudo
               </button>
               <button
                 onClick={() => {

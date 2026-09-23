@@ -1,52 +1,40 @@
 import { StorageService } from './storage';
 import { getIntuitivePronunciation } from '../utils/phonetics';
+import { PROMPT_BUILDER } from '../utils/prompts';
 
 export const AIService = {
   /**
-   * Main dispatch for conversing with AI Tutor
+   * Main dispatch for conversing with AI Tutor in Daily Lessons or Roleplay Exams
    */
-  async sendMessage({ lesson, tutor, phase, history, userMessage }) {
+  async sendMessage({ lesson, tutor, phase = 'PHASE_1_INPUT', history = [], userMessage, currentTurn = 1 }) {
     const settings = StorageService.getSettings();
     const openAiKey = StorageService.getOpenAiKey();
     const geminiKey = StorageService.getApiKey();
+    const userProfile = StorageService.getUserProfile();
 
     const provider = settings.aiProvider || (openAiKey ? 'openai' : geminiKey ? 'gemini' : 'simulated');
+    const isExam = lesson.nodeType === 'exam';
 
-    // Build the tailored prompt focusing on Portuguese tutoring with English target cards
-    const systemPrompt = `
-Você é ${tutor.name}, um tutor de inglês particular caloroso, encorajador, carismático e paciente.
-Personalidade: ${tutor.traits.join(', ')}.
-O aluno chama-se Victor, está no nível [${lesson.level || 'INICIANTE'}] e a aula atual é [${lesson.title} - ${lesson.titlePt}].
-Fase atual: [${phase === 'aula' ? 'FASE 1: AULA (Instrução de vocabulário e pronúncia)' : 'FASE 2: PRÁTICA (Roleplay em conversa real)'}].
-
-DIRETRIZES FUNDAMENTAIS DO MÉTODO DE ENSINO:
-1. FALE EM PORTUGUÊS DO BRASIL: Toda a sua conversa com o aluno, explicações, orientações e incentivos DEVEM ser em português natural e acolhedor (ex: "Muito bem, Victor! Vamos aprender agora como se fala...").
-2. FOCO NA FRASE-ALVO: Não despeje blocos de texto em inglês. Em cada turno, você apresenta uma frase clara que o aluno deve aprender e praticar falar em inglês.
-3. ESTRUTURA DO CARD DE PRONÚNCIA: Para toda nova frase ou correção, forneça um card pedagógico com:
-   - phrasePt: O significado em português (ex: "alguém esperando por mim")
-   - phraseTarget: A frase correta no idioma com a gramática natural nativa (ex: "the someone waiting for me")
-   - pronunciationGuide: A pronúncia facilitada e intuitiva em português brasileiro (ex: "de sô-mên vei-tin for maí"), dividindo sílabas por hífen para ser extremamente fácil de ler e falar sem travar.
-   - highlightWord: (opcional) Uma palavra-chave de destaque na frase em inglês.
-4. FEEDBACK AMIGÁVEL: Se o aluno enviou uma resposta ou tentou pronunciar, dê um feedback gentil em português antes de propor a próxima expressão.
-
-Retorne SEMPRE em formato JSON válido:
-{
-  "messagePt": "Sua fala amigável de tutor em português brasileiro explicando e convidando o aluno a falar",
-  "card": {
-    "phrasePt": "Significado em português",
-    "phraseTarget": "Frase em inglês gramaticalmente correta",
-    "pronunciationGuide": "Pronúncia abrasileirada e intuitiva separada por hífen",
-    "highlightWord": "palavra de destaque ou null"
-  },
-  "correctionPt": "Feedback ou correção gentil em português se o aluno errou algo (ou null)",
-  "isFeedbackReport": false,
-  "sessionCompleted": false
-}
-`;
+    // Build the dynamic prompt based on role (Exam vs Daily Lesson)
+    let systemPrompt = '';
+    if (isExam) {
+      systemPrompt = PROMPT_BUILDER.buildRoleplayExamPrompt({
+        node: lesson,
+        currentTurn,
+        studentName: userProfile.name || 'Victor'
+      });
+    } else {
+      systemPrompt = PROMPT_BUILDER.buildDailyLessonPrompt({
+        userProfile,
+        tutor,
+        node: lesson,
+        currentPhase: phase
+      });
+    }
 
     if (provider === 'openai' && openAiKey) {
       try {
-        return await AIService.callOpenAI({ systemPrompt, history, userMessage, openAiKey });
+        return await AIService.callOpenAI({ systemPrompt, history, userMessage, openAiKey, isExam, currentTurn });
       } catch (err) {
         console.warn('OpenAI error, falling back to simulated engine:', err);
       }
@@ -54,26 +42,26 @@ Retorne SEMPRE em formato JSON válido:
 
     if (provider === 'gemini' && geminiKey) {
       try {
-        return await AIService.callGemini({ systemPrompt, history, userMessage, geminiKey });
+        return await AIService.callGemini({ systemPrompt, history, userMessage, geminiKey, isExam, currentTurn });
       } catch (err) {
         console.warn('Gemini error, falling back to simulated engine:', err);
       }
     }
 
-    // Default intelligent simulated engine (provides instant, zero-config high fidelity responses)
-    return AIService.simulatedTutorResponse({ lesson, tutor, phase, history, userMessage });
+    // Default intelligent simulated engine
+    return AIService.simulatedTutorResponse({ lesson, tutor, phase, history, userMessage, currentTurn, isExam });
   },
 
-  async callOpenAI({ systemPrompt, history, userMessage, openAiKey }) {
+  async callOpenAI({ systemPrompt, history, userMessage, openAiKey, isExam, currentTurn }) {
     const messages = [
       { role: 'system', content: systemPrompt }
     ];
 
-    const recent = (history || []).slice(-6);
+    const recent = (history || []).slice(-8);
     for (const h of recent) {
       messages.push({
         role: h.sender === 'user' ? 'user' : 'assistant',
-        content: h.text || h.messagePt || ''
+        content: h.text || h.messagePt || h.inCharacterSpeechEn || ''
       });
     }
 
@@ -96,28 +84,31 @@ Retorne SEMPRE em formato JSON válido:
     const data = await res.json();
     const content = data.choices?.[0]?.message?.content;
     const parsed = JSON.parse(content);
-    
-    // Auto-fill pronunciation guide if missing
+
     if (parsed.card && !parsed.card.pronunciationGuide && parsed.card.phraseTarget) {
       parsed.card.pronunciationGuide = getIntuitivePronunciation(parsed.card.phraseTarget);
     }
 
     return {
-      messagePt: parsed.messagePt || parsed.replyPt || parsed.text,
+      messagePt: parsed.messagePt || parsed.inCharacterSpeechEn || parsed.text,
+      inCharacterSpeechEn: parsed.inCharacterSpeechEn,
       card: parsed.card || null,
       correctionPt: parsed.correctionPt || null,
       isFeedbackReport: parsed.isFeedbackReport || false,
-      sessionCompleted: parsed.sessionCompleted || false
+      examFinished: parsed.examFinished || false,
+      scores: parsed.scores || null,
+      passed: parsed.passed ?? (parsed.scores?.finalScore >= 70),
+      feedbackReportPt: parsed.feedbackReportPt || null
     };
   },
 
-  async callGemini({ systemPrompt, history, userMessage, geminiKey }) {
+  async callGemini({ systemPrompt, history, userMessage, geminiKey, isExam, currentTurn }) {
     const contents = [];
-    const recent = (history || []).slice(-6);
+    const recent = (history || []).slice(-8);
     for (const h of recent) {
       contents.push({
         role: h.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: h.text || h.messagePt || '' }]
+        parts: [{ text: h.text || h.messagePt || h.inCharacterSpeechEn || '' }]
       });
     }
     contents.push({ role: 'user', parts: [{ text: userMessage }] });
@@ -145,26 +136,87 @@ Retorne SEMPRE em formato JSON válido:
     }
 
     return {
-      messagePt: parsed.messagePt || parsed.replyPt || parsed.text,
+      messagePt: parsed.messagePt || parsed.inCharacterSpeechEn || parsed.text,
+      inCharacterSpeechEn: parsed.inCharacterSpeechEn,
       card: parsed.card || null,
       correctionPt: parsed.correctionPt || null,
       isFeedbackReport: parsed.isFeedbackReport || false,
-      sessionCompleted: parsed.sessionCompleted || false
+      examFinished: parsed.examFinished || false,
+      scores: parsed.scores || null,
+      passed: parsed.passed ?? (parsed.scores?.finalScore >= 70),
+      feedbackReportPt: parsed.feedbackReportPt || null
     };
   },
 
-  simulatedTutorResponse({ lesson, tutor, phase, history = [], userMessage = '' }) {
-    const textLower = userMessage.toLowerCase().trim();
+  simulatedTutorResponse({ lesson, tutor, phase, history = [], userMessage = '', currentTurn = 1, isExam = false }) {
+    const textLower = (userMessage || '').toLowerCase().trim();
 
-    // Check if user is saying goodbye or wrapping up
-    if (textLower.includes('goodbye') || textLower.includes('bye') || textLower.includes('tchau') || history.length >= 8) {
+    // LÓGICA DE AVALIAÇÃO PRÁTICA (Roleplay Exam)
+    if (isExam) {
+      // Se atingiu o 10º turno (ou se o aluno responder pela 5ª vez no simulado)
+      if (currentTurn >= 10 || history.length >= 8) {
+        return {
+          messagePt: "🏁 Prova Prática Concluída! Veja seu resultado detalhado de fluência e compreensão:",
+          examFinished: true,
+          scores: {
+            fluencyScore: 88,
+            comprehensionScore: 84,
+            problemSolvingScore: 92,
+            finalScore: 88
+          },
+          passed: true,
+          feedbackReportPt: {
+            summary: "Excelente desempenho sob pressão! Você manteve a calma, usou termos nativos de polidez ('Can I get...', 'Please') e resolveu o pedido com clareza em inglês americano.",
+            strengths: [
+              "Excelente velocidade de resposta sem travar",
+              "Uso natural de 'Can I get' em vez de tradução literal",
+              "Compreendeu as perguntas rápidas do atendente"
+            ],
+            criticalFixes: [
+              "Para pedir recibo, use 'Can I get a receipt?' em vez de 'I need paper'"
+            ],
+            nextModuleUnlocked: true
+          }
+        };
+      }
+
+      // Turnos dinâmicos do exame de cafeteria em NY
+      if (textLower.includes('coffee') || textLower.includes('iced') || textLower.includes('latte')) {
+        return {
+          messagePt: "Gotcha, one coffee. Size? You want Regular or Large? And milk or oat milk?",
+          inCharacterSpeechEn: "Gotcha, one coffee. Size? You want Regular or Large? And milk or oat milk?",
+          examFinished: false,
+          currentTurn: currentTurn + 1
+        };
+      }
+
+      if (textLower.includes('regular') || textLower.includes('large') || textLower.includes('medium') || textLower.includes('milk')) {
+        return {
+          messagePt: "Alright, that'll be $4.50. You paying with cash or tapping a card?",
+          inCharacterSpeechEn: "Alright, that'll be $4.50. You paying with cash or tapping a card?",
+          examFinished: false,
+          currentTurn: currentTurn + 1
+        };
+      }
+
       return {
-        messagePt: `Parabéns, Victor! Concluímos a nossa sessão com sucesso. Você praticou com muita dedicação e sua pronúncia está evoluindo a passos largos!`,
+        messagePt: "Yeah? Need anything else with that like a muffin, or is that it for ya?",
+        inCharacterSpeechEn: "Yeah? Need anything else with that like a muffin, or is that it for ya?",
+        examFinished: false,
+        currentTurn: currentTurn + 1
+      };
+    }
+
+    // LÓGICA DAS AULAS DIÁRIAS (A1-A2)
+    // Se o usuário estiver encerrando
+    if (textLower.includes('goodbye') || textLower.includes('bye') || textLower.includes('tchau') || history.length >= 10) {
+      return {
+        messagePt: "Parabéns pela sessão de hoje, Victor! Você praticou fala ativa com consistência e completou seus 30 minutos de imersão no Método Natural.",
         card: {
-          phrasePt: 'Até mais! Tenha um ótimo dia!',
-          phraseTarget: 'See you later! Have a great day!',
-          pronunciationGuide: 'síi iú lêi-ter! rrév ê grêit dêi!',
-          highlightWord: 'later'
+          phrasePt: "Até logo! Tenha um ótimo dia!",
+          phraseTarget: "See you later! Have a great day!",
+          pronunciationGuide: "síi iú lêi-ter! rrév ê grêit dêi!",
+          highlightWord: "later"
         },
         correctionPt: null,
         isFeedbackReport: true,
@@ -172,40 +224,11 @@ Retorne SEMPRE em formato JSON válido:
       };
     }
 
-    // Roleplay Coffee simulation (Cafeteria)
-    if (lesson.id === 'ordering-at-cafe') {
-      if (textLower.includes('black') || textLower.includes('coffee') || textLower.includes('want')) {
-        return {
-          messagePt: "Excelente escolha, Victor! Para pedir de um jeito muito natural e educado, americanos usam 'Can I get a black coffee, please?'. Veja como fica fácil de ler e pronunciar:",
-          card: {
-            phrasePt: "Posso pegar um café preto, por favor?",
-            phraseTarget: "Can I get a black coffee, please?",
-            pronunciationGuide: "kén ai gét ê blék có-fi, pliis?",
-            highlightWord: "Can I get"
-          },
-          correctionPt: textLower.includes('want') 
-            ? "💡 Dica de ouro: em vez de 'I want', use 'Can I get...'. Soa muito mais educado e nativo!" 
-            : null
-        };
-      }
-
-      return {
-        messagePt: `Olá! Bem-vindo à cafeteria. Vamos aprender agora como pedir um café com leite de forma bem natural em inglês:`,
-        card: {
-          phrasePt: "Eu gostaria de um café com leite, por favor.",
-          phraseTarget: "I would like a latte with oat milk, please.",
-          pronunciationGuide: "ai uúd láik ê lá-tei uiz ôut mílk, pliis.",
-          highlightWord: "would like"
-        },
-        correctionPt: null
-      };
-    }
-
     // Lição: Say Hello (Cumprimentos)
-    if (lesson.id === 'say-hello') {
-      if (textLower.includes('hello') || textLower.includes('hi') || textLower.includes('oi')) {
+    if (lesson.id === 'day-01-hello' || lesson.id === 'say-hello') {
+      if (textLower.includes('hello') || textLower.includes('hi') || textLower.includes('good morning')) {
         return {
-          messagePt: "Muito bem, Victor! Agora vamos aprender como perguntar o nome de alguém em uma conversa informal:",
+          messagePt: "Excelente começo! Agora veja como você pergunta o nome de alguém em inglês com a pronúncia bem natural:",
           card: {
             phrasePt: "Qual é o seu nome?",
             phraseTarget: "What is your name?",
@@ -218,7 +241,7 @@ Retorne SEMPRE em formato JSON válido:
 
       if (textLower.includes('victor') || textLower.includes('my name is')) {
         return {
-          messagePt: "Isso aí! Soa super natural. Agora veja como se diz 'Prazer em te conhecer' quando você se apresenta para alguém:",
+          messagePt: "Muito bem! Agora vamos falar 'Prazer em te conhecer', uma frase que você vai usar sempre:",
           card: {
             phrasePt: "Prazer em conhecer você!",
             phraseTarget: "Nice to meet you!",
@@ -230,7 +253,7 @@ Retorne SEMPRE em formato JSON válido:
       }
 
       return {
-        messagePt: `Oi, Victor! Eu sou o ${tutor.name}, seu tutor. Vamos aprender agora como dizer 'Bom dia' em inglês com a pronúncia perfeita:`,
+        messagePt: `Oi, Victor! Sou o ${tutor.name}, seu tutor. Vamos aprender agora como dizer 'Bom dia' em inglês:`,
         card: {
           phrasePt: "Bom dia!",
           phraseTarget: "Good morning!",
@@ -242,10 +265,10 @@ Retorne SEMPRE em formato JSON válido:
     }
 
     // Lição: How Are You?
-    if (lesson.id === 'how-are-you') {
-      if (textLower.includes('good') || textLower.includes('fine') || textLower.includes('bem')) {
+    if (lesson.id === 'day-02-how-are-you' || lesson.id === 'how-are-you') {
+      if (textLower.includes('good') || textLower.includes('fine') || textLower.includes('well')) {
         return {
-          messagePt: "Mandou bem demais! Agora, para devolver a pergunta e manter o papo fluindo, veja como se fala 'E você?':",
+          messagePt: "Mandou muito bem! Agora veja como você devolve a pergunta para manter a conversa fluindo:",
           card: {
             phrasePt: "Estou bem, e você?",
             phraseTarget: "I am good, and you?",
@@ -257,7 +280,7 @@ Retorne SEMPRE em formato JSON válido:
       }
 
       return {
-        messagePt: "Perfeito, Victor! Quando um amigo te cumprimenta no corredor, ele pergunta 'Como você está?'. Veja como responder:",
+        messagePt: "Perfeito, Victor! Quando alguém te perguntar como você está, veja como falar com ritmo nativo:",
         card: {
           phrasePt: "Como você está hoje?",
           phraseTarget: "How are you doing today?",
@@ -268,14 +291,42 @@ Retorne SEMPRE em formato JSON válido:
       };
     }
 
-    // Exemplo genérico / personalizado (inspirado no pedido do usuário)
+    // Lição: Numbers & Prices
+    if (lesson.id === 'day-03-numbers-prices' || lesson.id === 'numbers') {
+      return {
+        messagePt: "Boa pergunta! Para perguntar o preço em qualquer loja nos EUA, você fala assim:",
+        card: {
+          phrasePt: "Quanto custa essa garrafa de água?",
+          phraseTarget: "How much is that water bottle?",
+          pronunciationGuide: "rráu mâtch iz dét uó-ter bó-tol?",
+          highlightWord: "How much"
+        },
+        correctionPt: null
+      };
+    }
+
+    // Lição: Ordering at a Café
+    if (lesson.id === 'day-05-cafe-order' || lesson.id === 'ordering-at-cafe') {
+      return {
+        messagePt: "Ótimo! Em vez de 'I want', use a forma mais educada e comum dos nativos:",
+        card: {
+          phrasePt: "Me vê um café preto, por favor?",
+          phraseTarget: "Can I get a black coffee, please?",
+          pronunciationGuide: "kén ai gét ê blék có-fi, pliis?",
+          highlightWord: "Can I get"
+        },
+        correctionPt: null
+      };
+    }
+
+    // Fallback padrão
     return {
-      messagePt: "Vamos aprender agora como falar uma frase muito usada no dia a dia em inglês:",
+      messagePt: "Muito bom, Victor! Vamos aprender mais uma frase muito usada em conversas cotidianas:",
       card: {
         phrasePt: "Alguém esperando por mim",
         phraseTarget: "the someone waiting for me",
         pronunciationGuide: "de sô-mên vei-tin for maí",
-        highlightWord: "me"
+        highlightWord: "waiting for me"
       },
       correctionPt: null
     };

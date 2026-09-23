@@ -8,14 +8,14 @@ import { ConversationRoom } from './components/Conversation/ConversationRoom';
 import { TutorSelectModal } from './components/Common/TutorSelectModal';
 import { UserProfileModal } from './components/Settings/UserProfileModal';
 import { TUTORS, DEFAULT_TUTOR } from './data/tutors';
-import { ROADMAP_LEVELS, ALL_LESSONS } from './data/lessons';
+import { ALL_DAYS, CEFR_MODULES } from './data/modules';
 import { StorageService } from './services/storage';
 
 export function App() {
   const [activeTab, setActiveTab] = useState('home'); // 'home' | 'progresso' | 'settings'
   const [selectedTutor, setSelectedTutor] = useState(DEFAULT_TUTOR);
   const [activeLesson, setActiveLesson] = useState(null);
-  const [completedLessons, setCompletedLessons] = useState(['say-hello']);
+  const [completedLessons, setCompletedLessons] = useState(['day-01-hello']);
   const [userProfile, setUserProfile] = useState(StorageService.getUserProfile());
   const [streakInfo, setStreakInfo] = useState(StorageService.getStreakInfo());
 
@@ -45,8 +45,7 @@ export function App() {
   };
 
   const handleStartActiveCall = () => {
-    // Start currently unlocked lesson (e.g. 'how-are-you' or first incomplete)
-    const currentLesson = ALL_LESSONS.find(l => !completedLessons.includes(l.id)) || ALL_LESSONS[1];
+    const currentLesson = ALL_DAYS.find(l => !completedLessons.includes(l.id)) || ALL_DAYS[0];
     setActiveLesson(currentLesson);
   };
 
@@ -56,9 +55,9 @@ export function App() {
       setCompletedLessons(updated);
       setStreakInfo(StorageService.getStreakInfo());
 
-      // Move to next lesson
-      const currentIndex = ALL_LESSONS.findIndex(l => l.id === activeLesson.id);
-      const nextLesson = ALL_LESSONS[currentIndex + 1];
+      // Move to next day
+      const currentIndex = ALL_DAYS.findIndex(l => l.id === activeLesson.id);
+      const nextLesson = ALL_DAYS[currentIndex + 1];
       if (nextLesson) {
         setActiveLesson(nextLesson);
       } else {
@@ -127,7 +126,7 @@ export function App() {
                   tutor={selectedTutor}
                   onOpenTutorModal={() => setIsTutorModalOpen(true)}
                   onStartCall={handleStartActiveCall}
-                  activeLesson={ALL_LESSONS.find(l => !completedLessons.includes(l.id)) || ALL_LESSONS[1]}
+                  activeLesson={ALL_DAYS.find(l => !completedLessons.includes(l.id)) || ALL_DAYS[0]}
                 />
 
               </div>
