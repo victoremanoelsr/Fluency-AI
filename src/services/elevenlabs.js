@@ -1,42 +1,42 @@
 import { StorageService } from './storage';
 
-// As 4 Vozes Escolhidas pelo Usuário no ElevenLabs com Status 200 Confirmado
+// As 4 Vozes Configuradas com os IDs Oficiais fornecidos pelo Usuário
 export const ELEVENLABS_TUTORS = [
-  {
-    id: 'jessica',
-    name: 'Jessica',
-    origin: 'Califórnia, EUA',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'cgSgspJ2msm6clMCkdW9', // Jessica
-    style: 'Expressiva, amigável e natural',
-    description: 'Voz jovem, acolhedora e expressiva. Ótima para treinar conversação do dia a dia com ritmo americano.'
-  },
   {
     id: 'will',
     name: 'Will',
     origin: 'Chicago, EUA',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'bIHbv24MWmeRgasZH58o', // Will
-    style: 'Descontraído, casual e gírias',
-    description: 'Voz natural e otimista. Perfeito para falar do cotidiano, esportes e gírias como os nativos falam.'
+    voiceId: 'CstacWqMhJQlnfLPxRG4', // Will
+    style: 'Deep, Smooth and Affectionate',
+    description: 'Voz dinâmica e casual, perfeita para aprender gírias, conexões de palavras e conversação informal.'
   },
   {
-    id: 'alice',
-    name: 'Alice',
-    origin: 'Nova York, EUA',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'Xb7hH8MSUJpSbSDYk0k2', // Alice
-    style: 'Clara, didática e confiante',
-    description: 'Dicção muito nítida e cadenciada. Ideal para quem quer destravar o entendimento sem pressa.'
+    id: 'ana-alice',
+    name: 'Ana Alice',
+    origin: 'Califórnia, EUA',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    voiceId: 'ORgG8rwdAiMYRug8RJwR', // Ana Alice
+    style: 'Friendly & Clear',
+    description: 'Voz super fluida e amigável. Ótima para praticar o inglês falado do dia a dia e ganhar ritmo.'
   },
   {
-    id: 'liam',
-    name: 'Liam',
+    id: 'paulo',
+    name: 'Paulo',
     origin: 'Austin, Texas, EUA',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'TX3LPaxmHKxFdv7VOQHJ', // Liam
-    style: 'Dinâmico, moderno e comunicador',
-    description: 'Tom moderno e jovem com energia comunicativa para destravar a fala rápida sem medo de errar.'
+    voiceId: 'Qrdut83w0Cr152Yb4Xn3', // Paulo
+    style: 'Expressive and Confident',
+    description: 'Tom acolhedor e dicção super nítida. Excelente para destravar a fala passo a passo sem pressão.'
+  },
+  {
+    id: 'andrea-lot',
+    name: 'Andrea Lot',
+    origin: 'Nova York, EUA',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
+    voiceId: 'HOfBIVLhom4mc9WvXfyH', // Andrea Lot
+    style: 'Moderna, enérgica e envolvente',
+    description: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar rápido sem travar.'
   }
 ];
 
