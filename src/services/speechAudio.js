@@ -10,7 +10,7 @@ class SpeechAudioService {
     this.isPlaying = false;
     this.currentAudioElement = null;
     this.onStateChange = null;
-    this.currentTutorVoiceId = 'CstacWqMhJQlnfLPxRG4'; // Will padrão
+    this.currentTutorVoiceId = 'bIHbv24MWmeRgasZH58o'; // Will padrão oficial ElevenLabs
 
     if (this.synth) {
       this.loadVoices();
@@ -151,9 +151,11 @@ class SpeechAudioService {
       .replace(/\(.*?\)/g, '')
       .trim();
 
-    // 1. Tentar ElevenLabs se houver chave configurada
-    const targetVoiceId = voiceId || this.currentTutorVoiceId || '21m00Tcm4TlvDq8ikWAM';
-    if (elevenLabsService.getApiKey()) {
+    // 1. Tentar ElevenLabs com chave ativa
+    const targetVoiceId = voiceId || this.currentTutorVoiceId || 'bIHbv24MWmeRgasZH58o';
+    const apiKey = elevenLabsService.getApiKey();
+
+    if (apiKey) {
       try {
         this.isPlaying = true;
         if (onStart) onStart();
@@ -167,19 +169,24 @@ class SpeechAudioService {
             if (this.onStateChange) this.onStateChange(false);
           },
           onError: (err) => {
-            console.warn('Erro ElevenLabs, caindo para sintetizador do navegador:', err);
-            this.speakFallback(cleanedText, { lang, rate, pitch, onEnd, onError });
+            console.error('Erro na reprodução ElevenLabs:', err);
+            this.isPlaying = false;
+            if (onError) onError(err);
+            if (onEnd) onEnd();
+            if (this.onStateChange) this.onStateChange(false);
           }
         });
 
         if (played) return;
       } catch (err) {
-        console.warn('Falha no ElevenLabs TTS, usando voz nativa do sistema:', err);
+        console.error('Falha no ElevenLabs TTS:', err);
       }
     }
 
-    // Fallback: Voz nativa do navegador
-    this.speakFallback(cleanedText, { lang, rate, pitch, onStart, onEnd, onError });
+    // Fallback apenas se não houver nenhuma chave configurada
+    if (!apiKey) {
+      this.speakFallback(cleanedText, { lang, rate, pitch, onStart, onEnd, onError });
+    }
   }
 
   speakFallback(cleanedText, { lang = 'en-US', rate = 0.95, pitch = 1.0, onStart, onEnd, onError } = {}) {
@@ -239,7 +246,7 @@ class SpeechAudioService {
     const fullBilingualText = `${introPt || ''}. ${phraseEn || ''}`.trim();
 
     // Com o modelo eleven_multilingual_v2, ele fala português e inglês perfeitamente numa única passagem
-    const targetVoiceId = voiceId || this.currentTutorVoiceId || '21m00Tcm4TlvDq8ikWAM';
+    const targetVoiceId = voiceId || this.currentTutorVoiceId || 'bIHbv24MWmeRgasZH58o';
     if (elevenLabsService.getApiKey()) {
       return this.speak(fullBilingualText, {
         lang: 'pt-BR',

@@ -75,7 +75,7 @@ export const StorageService = {
 
   // ElevenLabs Key
   getElevenLabsKey: () => {
-    return localStorage.getItem('fluency_elevenlabs_api_key') || import.meta.env.VITE_ELEVENLABS_API_KEY || '';
+    return localStorage.getItem('fluency_elevenlabs_api_key') || import.meta.env?.VITE_ELEVENLABS_API_KEY || 'sk_b602f5af05b4835207a1ee13227f8a1dc01143f0ca4f80c7';
   },
   setElevenLabsKey: (key) => {
     localStorage.setItem('fluency_elevenlabs_api_key', key.trim());

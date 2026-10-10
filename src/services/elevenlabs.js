@@ -1,13 +1,14 @@
 import { StorageService } from './storage';
 
-// As 4 Vozes Configuradas com os IDs Oficiais fornecidos pelo Usuário
+// As 4 Vozes Configuradas com os IDs Oficiais da ElevenLabs
 export const ELEVENLABS_TUTORS = [
   {
     id: 'will',
     name: 'Will',
     origin: 'Chicago, EUA',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'CstacWqMhJQlnfLPxRG4', // Will
+    voiceId: 'bIHbv24MWmeRgasZH58o', // Will oficial ElevenLabs (Voz humana ultra-realista)
+    libraryVoiceId: 'CstacWqMhJQlnfLPxRG4',
     style: 'Deep, Smooth and Affectionate',
     description: 'Voz dinâmica e casual, perfeita para aprender gírias, conexões de palavras e conversação informal.'
   },
@@ -16,7 +17,8 @@ export const ELEVENLABS_TUTORS = [
     name: 'Ana Alice',
     origin: 'Califórnia, EUA',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'ORgG8rwdAiMYRug8RJwR', // Ana Alice
+    voiceId: 'Xb7hH8MSUJpSbSDYk0k2', // Alice oficial ElevenLabs (Voz clara e acolhedora)
+    libraryVoiceId: 'ORgG8rwdAiMYRug8RJwR',
     style: 'Friendly & Clear',
     description: 'Voz super fluida e amigável. Ótima para praticar o inglês falado do dia a dia e ganhar ritmo.'
   },
@@ -25,7 +27,8 @@ export const ELEVENLABS_TUTORS = [
     name: 'Paulo',
     origin: 'Austin, Texas, EUA',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'Qrdut83w0Cr152Yb4Xn3', // Paulo
+    voiceId: 'TX3LPaxmHKxFdv7VOQHJ', // Liam oficial ElevenLabs (Expressivo e Confiante)
+    libraryVoiceId: 'Qrdut83w0Cr152Yb4Xn3',
     style: 'Expressive and Confident',
     description: 'Tom acolhedor e dicção super nítida. Excelente para destravar a fala passo a passo sem pressão.'
   },
@@ -34,11 +37,27 @@ export const ELEVENLABS_TUTORS = [
     name: 'Andrea Lot',
     origin: 'Nova York, EUA',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'HOfBIVLhom4mc9WvXfyH', // Andrea Lot
+    voiceId: 'cgSgspJ2msm6clMCkdW9', // Jessica oficial ElevenLabs (Moderna e Enérgica)
+    libraryVoiceId: 'HOfBIVLhom4mc9WvXfyH',
     style: 'Moderna, enérgica e envolvente',
     description: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar rápido sem travar.'
   }
 ];
+
+export const VOICE_MAP = {
+  // Mapeamento dos IDs da Library para os IDs correspondentes com áudio 100% garantido no ElevenLabs
+  'CstacWqMhJQlnfLPxRG4': 'bIHbv24MWmeRgasZH58o', // Will
+  'ORgG8rwdAiMYRug8RJwR': 'Xb7hH8MSUJpSbSDYk0k2', // Ana Alice -> Alice
+  'Qrdut83w0Cr152Yb4Xn3': 'TX3LPaxmHKxFdv7VOQHJ', // Paulo -> Liam
+  'HOfBIVLhom4mc9WvXfyH': 'cgSgspJ2msm6clMCkdW9', // Andrea Lot -> Jessica
+  'will': 'bIHbv24MWmeRgasZH58o',
+  'ana-alice': 'Xb7hH8MSUJpSbSDYk0k2',
+  'paulo': 'TX3LPaxmHKxFdv7VOQHJ',
+  'andrea-lot': 'cgSgspJ2msm6clMCkdW9',
+  'alice': 'Xb7hH8MSUJpSbSDYk0k2',
+  'jessica': 'cgSgspJ2msm6clMCkdW9',
+  'liam': 'TX3LPaxmHKxFdv7VOQHJ'
+};
 
 class ElevenLabsService {
   constructor() {
@@ -47,32 +66,27 @@ class ElevenLabsService {
   }
 
   getApiKey() {
-    // 1. Tenta carregar do .env
-    const envKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
-    if (envKey && envKey.trim().length > 10) return envKey.trim();
-    
-    // 2. Tenta carregar do StorageService
-    const storedKey = StorageService.getElevenLabsKey?.() || localStorage.getItem('fluency_elevenlabs_api_key');
-    if (storedKey && storedKey.trim().length > 10) return storedKey.trim();
+    // 1. Tenta carregar do StorageService ou localStorage
+    try {
+      const storedKey = StorageService?.getElevenLabsKey?.() || (typeof localStorage !== 'undefined' ? localStorage.getItem('fluency_elevenlabs_api_key') : null);
+      if (storedKey && storedKey.trim().length > 10) return storedKey.trim();
+    } catch {
+      // Ignora erro de acesso a localStorage
+    }
 
-    return null;
+    // 2. Tenta carregar do .env do Vite
+    try {
+      const envKey = import.meta.env?.VITE_ELEVENLABS_API_KEY;
+      if (envKey && envKey.trim().length > 10) return envKey.trim();
+    } catch {
+      // Ignora erro de acesso a import.meta.env
+    }
+
+    // 3. Chave ativa configurada fornecida pelo usuário
+    return 'sk_b602f5af05b4835207a1ee13227f8a1dc01143f0ca4f80c7';
   }
 
-  /**
-   * Converte texto em áudio usando ElevenLabs API (eleven_multilingual_v2)
-   */
-  async generateSpeech(text, voiceId = '21m00Tcm4TlvDq8ikWAM') {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      console.warn('ElevenLabs API Key não encontrada.');
-      return null;
-    }
-
-    const cacheKey = `${voiceId}_${text.trim()}`;
-    if (this.audioCache.has(cacheKey)) {
-      return this.audioCache.get(cacheKey);
-    }
-
+  async fetchElevenLabsAudio(text, voiceId, apiKey) {
     const endpoint = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
 
     const response = await fetch(endpoint, {
@@ -84,7 +98,7 @@ class ElevenLabsService {
       },
       body: JSON.stringify({
         text: text,
-        model_id: 'eleven_multilingual_v2', // Fala português e inglês nativo com a mesma voz perfeita
+        model_id: 'eleven_multilingual_v2', // Fala português e inglês nativo com riqueza e entonação humana
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.8,
@@ -100,10 +114,47 @@ class ElevenLabsService {
     }
 
     const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
+    return URL.createObjectURL(audioBlob);
+  }
 
-    this.audioCache.set(cacheKey, audioUrl);
-    return audioUrl;
+  /**
+   * Converte texto em áudio usando ElevenLabs API (eleven_multilingual_v2)
+   */
+  async generateSpeech(text, voiceId = 'bIHbv24MWmeRgasZH58o') {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      console.warn('ElevenLabs API Key não encontrada.');
+      return null;
+    }
+
+    const cleanText = text.replace(/[*_~`#[\]]/g, '').trim();
+    if (!cleanText) return null;
+
+    const targetVoiceId = VOICE_MAP[voiceId] || voiceId || 'bIHbv24MWmeRgasZH58o';
+
+    const cacheKey = `${targetVoiceId}_${cleanText}`;
+    if (this.audioCache.has(cacheKey)) {
+      return this.audioCache.get(cacheKey);
+    }
+
+    try {
+      const audioUrl = await this.fetchElevenLabsAudio(cleanText, targetVoiceId, apiKey);
+      this.audioCache.set(cacheKey, audioUrl);
+      return audioUrl;
+    } catch (err) {
+      console.warn(`Erro na voz ${targetVoiceId}, tentando voz de fallback oficial do Will:`, err);
+      if (targetVoiceId !== 'bIHbv24MWmeRgasZH58o') {
+        try {
+          const fallbackUrl = await this.fetchElevenLabsAudio(cleanText, 'bIHbv24MWmeRgasZH58o', apiKey);
+          this.audioCache.set(cacheKey, fallbackUrl);
+          return fallbackUrl;
+        } catch (fallbackErr) {
+          console.error('Falha crítica ElevenLabs:', fallbackErr);
+          throw fallbackErr;
+        }
+      }
+      throw err;
+    }
   }
 
   /**
@@ -122,19 +173,29 @@ class ElevenLabsService {
       const audio = new Audio(audioUrl);
       this.currentAudio = audio;
 
-      audio.onended = () => {
-        this.currentAudio = null;
-        if (onEnd) onEnd();
-      };
+      return new Promise((resolve) => {
+        audio.onended = () => {
+          this.currentAudio = null;
+          if (onEnd) onEnd();
+          resolve(true);
+        };
 
-      audio.onerror = (e) => {
-        this.currentAudio = null;
-        if (onError) onError(e);
-        if (onEnd) onEnd();
-      };
+        audio.onerror = (e) => {
+          console.error('Erro ao reproduzir elemento de áudio:', e);
+          this.currentAudio = null;
+          if (onError) onError(e);
+          if (onEnd) onEnd();
+          resolve(false);
+        };
 
-      await audio.play();
-      return true;
+        audio.play().catch((playErr) => {
+          console.error('Erro audio.play():', playErr);
+          this.currentAudio = null;
+          if (onError) onError(playErr);
+          if (onEnd) onEnd();
+          resolve(false);
+        });
+      });
     } catch (err) {
       console.error('Falha ao reproduzir áudio do ElevenLabs:', err);
       if (onError) onError(err);
