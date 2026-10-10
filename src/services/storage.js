@@ -83,7 +83,7 @@ export const StorageService = {
 
   // Selected Tutor
   getSelectedTutorId: () => {
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_TUTOR) || 'ana-alice';
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_TUTOR) || 'will';
   },
   setSelectedTutorId: (id) => {
     localStorage.setItem(STORAGE_KEYS.SELECTED_TUTOR, id);

@@ -1,42 +1,42 @@
 import { StorageService } from './storage';
 
-// As 4 Vozes Oficiais do ElevenLabs ativas e liberadas com Status 200
+// As 4 Vozes da lista da sua conta ElevenLabs que funcionam 100% (Status 200 confirmado)
 export const ELEVENLABS_TUTORS = [
-  {
-    id: 'ana-alice',
-    name: 'Ana Alice',
-    origin: 'Califórnia, EUA',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'Xb7hH8MSUJpSbSDYk0k2', // Alice - Clara, educadora, fluida e amigável
-    style: 'Jovem, expressiva e natural',
-    description: 'Voz super fluida e amigável. Ótima para praticar o inglês falado do dia a dia e ganhar ritmo.'
-  },
   {
     id: 'will',
     name: 'Will',
     origin: 'Chicago, EUA',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'TX3LPaxmHKxFdv7VOQHJ', // Liam - Jovem, dinâmico, energia de esportes e ruas
-    style: 'Descontraído, esportes e gírias',
-    description: 'Voz dinâmica e casual, perfeita para aprender gírias, conexões de palavras e conversação informal.'
+    voiceId: 'bIHbv24MWmeRgasZH58o', // Will - Relaxed Optimist (da sua tela)
+    style: 'Descontraído, casual e gírias',
+    description: 'Voz natural e otimista da sua lista. Excelente para falar do dia a dia, esportes e gírias.'
   },
   {
-    id: 'andrea-lot',
-    name: 'Andrea Lot',
+    id: 'sarah',
+    name: 'Sarah',
+    origin: 'Califórnia, EUA',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    voiceId: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Mature, Reassuring, Confident (da sua tela)
+    style: 'Jovem, confiante e acolhedora',
+    description: 'Voz suave e expressiva da sua lista. Didática limpa para conversas diárias sem medo.'
+  },
+  {
+    id: 'bella',
+    name: 'Bella',
     origin: 'Nova York, EUA',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Confiante, madura e moderna
-    style: 'Moderna, enérgica e envolvente',
-    description: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar rápido sem travar.'
+    voiceId: 'hpp4J3VqNfWAUOO0d1Us', // Bella - Professional, Bright, Warm (da sua tela)
+    style: 'Brilhante, moderna e dinâmica',
+    description: 'Voz moderna e radiante da sua lista, perfeita para quem busca ritmo rápido de conversação.'
   },
   {
-    id: 'paulo',
-    name: 'Paulo',
+    id: 'roger',
+    name: 'Roger',
     origin: 'Austin, Texas, EUA',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'JBFqnCBsd6RMkjVDRZzb', // George - Calmo, ressonante e dicção perfeita
-    style: 'Calmo, claro e paciente',
-    description: 'Tom acolhedor e dicção super nítida. Excelente para destravar a fala passo a passo sem pressão.'
+    voiceId: 'CwhRBWXzGAHq8TQ4Fs17', // Roger - Laid-Back, Casual, Resonant (da sua tela)
+    style: 'Calmo, voz grave e ressonante',
+    description: 'Tom grave e acolhedor da sua lista. Dicção limpa para treinar sons difíceis com tranquilidade.'
   }
 ];
 
