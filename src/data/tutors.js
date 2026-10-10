@@ -1,5 +1,19 @@
 export const TUTORS = [
   {
+    id: 'jessica',
+    name: 'Jessica',
+    origin: 'Califórnia, EUA',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    traits: ['Expressiva', 'Amigável', 'Inglês do Dia a Dia'],
+    tags: [
+      { label: 'Conversação', icon: '💬' },
+      { label: 'Gírias & Cultura', icon: '✨' }
+    ],
+    bio: 'Voz jovem, acolhedora e expressiva do ElevenLabs. Ensina o inglês autêntico das conversas reais com amigos, filmes e séries.',
+    voice: 'en-US',
+    voiceId: 'cgSgspJ2msm6clMCkdW9'
+  },
+  {
     id: 'will',
     name: 'Will',
     origin: 'Chicago, EUA',
@@ -9,51 +23,37 @@ export const TUTORS = [
       { label: 'Esportes', icon: '⚽' },
       { label: 'Dia a Dia', icon: '🍕' }
     ],
-    bio: 'Voz dinâmica e casual da sua lista do ElevenLabs. Excelente para falar do dia a dia, gírias e inglês das ruas americanas.',
+    bio: 'Voz dinâmica e casual do ElevenLabs. Excelente para falar do dia a dia, gírias e inglês das ruas americanas.',
     voice: 'en-US',
     voiceId: 'bIHbv24MWmeRgasZH58o'
   },
   {
-    id: 'sarah',
-    name: 'Sarah',
-    origin: 'Califórnia, EUA',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    traits: ['Amigável', 'Expressiva', 'Inglês do Dia a Dia'],
-    tags: [
-      { label: 'Conversação', icon: '💬' },
-      { label: 'Gírias & Cultura', icon: '✨' }
-    ],
-    bio: 'Voz suave, madura e acolhedora da sua lista do ElevenLabs. Ensina o inglês autêntico das conversas reais com amigos e filmes.',
-    voice: 'en-US',
-    voiceId: 'EXAVITQu4vr4xnSDxMaL'
-  },
-  {
-    id: 'bella',
-    name: 'Bella',
+    id: 'alice',
+    name: 'Alice',
     origin: 'Nova York, EUA',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    traits: ['Moderna', 'Enérgica', 'Ritmo Nativo'],
+    traits: ['Clara', 'Didática', 'Ritmo Nativo'],
     tags: [
       { label: 'Viagens', icon: '🗽' },
       { label: 'Música & Estilo', icon: '🎧' }
     ],
-    bio: 'Voz moderna, brilhante e dinâmica da sua lista do ElevenLabs. Perfeita para quem busca ritmo rápido e destravar a fala.',
+    bio: 'Dicção refinada e cadência perfeita do ElevenLabs. Ideal para quem quer destravar o entendimento sem pressa.',
     voice: 'en-US',
-    voiceId: 'hpp4J3VqNfWAUOO0d1Us'
+    voiceId: 'Xb7hH8MSUJpSbSDYk0k2'
   },
   {
-    id: 'roger',
-    name: 'Roger',
+    id: 'liam',
+    name: 'Liam',
     origin: 'Austin, Texas, EUA',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
-    traits: ['Calmo', 'Paciente', 'Dicção Nítida'],
+    traits: ['Dinâmico', 'Moderno', 'Energia'],
     tags: [
       { label: 'Para Começar', icon: '🌱' },
       { label: 'Carreira', icon: '💼' }
     ],
-    bio: 'Tom calmo, ressonante e paciente da sua lista do ElevenLabs. Ótimo para perder a vergonha de falar e treinar sons difíceis.',
+    bio: 'Tom moderno e comunicativo do ElevenLabs. Perfeito para destravar a agilidade ao falar e perder o medo.',
     voice: 'en-US',
-    voiceId: 'CwhRBWXzGAHq8TQ4Fs17'
+    voiceId: 'TX3LPaxmHKxFdv7VOQHJ'
   },
   {
     id: 'mateo',

@@ -16,10 +16,10 @@ export const TutorSelectModal = ({
   const handlePlayVoice = (tutor, e) => {
     e?.stopPropagation();
     const samplePhrases = {
-      'will': "E aí Victor, beleza? Sou o Will da sua lista do ElevenLabs! Bora praticar o inglês falado real?",
-      'sarah': "Olá Victor! Sou a Sarah. Pronta para te ajudar a falar inglês com calma e confiança no dia a dia!",
-      'bella': "Oi Victor! Sou a Bella. Vamos destravar sua fluência com energia e ritmo nativo!",
-      'roger': "Olá Victor, sou o Roger. Vamos treinar sua pronúncia com dicção clara e no seu ritmo."
+      'jessica': "Olá Victor! Sou a Jessica. Vamos praticar o inglês falado do dia a dia juntos?",
+      'will': "E aí Victor, beleza? Sou o Will! Bora aprender as gírias e o inglês das ruas americanas?",
+      'alice': "Oi Victor! Sou a Alice. Pronta para te ajudar a entender e falar inglês com calma e clareza!",
+      'liam': "Fala Victor! Sou o Liam. Vamos destravar sua fala com energia e ritmo nativo!"
     };
     speechAudio.speak(samplePhrases[tutor.id] || `Hello Victor, I am ${tutor.name}.`, {
       voiceId: tutor.voiceId

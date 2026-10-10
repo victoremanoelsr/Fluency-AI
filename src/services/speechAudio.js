@@ -10,7 +10,7 @@ class SpeechAudioService {
     this.isPlaying = false;
     this.currentAudioElement = null;
     this.onStateChange = null;
-    this.currentTutorVoiceId = 'bIHbv24MWmeRgasZH58o'; // Will (da sua lista) padrão
+    this.currentTutorVoiceId = 'cgSgspJ2msm6clMCkdW9'; // Jessica padrão
 
     if (this.synth) {
       this.loadVoices();
