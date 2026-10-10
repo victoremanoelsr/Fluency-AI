@@ -101,6 +101,9 @@ export const StorageService = {
   saveUserProfile: (profile) => {
     localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
   },
+  setUserProfile: (profile) => {
+    localStorage.setItem(STORAGE_KEYS.USER_PROFILE, JSON.stringify(profile));
+  },
 
   // Call History
   getCallHistory: () => {
