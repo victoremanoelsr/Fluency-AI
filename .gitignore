@@ -26,3 +26,4 @@ dist-ssr
 *.mp4
 screenshot*.png
 scrape*.js
+capture_preview.js

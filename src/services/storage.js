@@ -15,7 +15,7 @@ const STORAGE_KEYS = {
 };
 
 export const defaultSettings = {
-  aiProvider: 'openai', // 'openai' | 'gemini' | 'simulated'
+  aiProvider: 'gemini', // 'gemini' | 'openai' | 'simulated'
   geminiModel: 'gemini-1.5-flash',
   openaiModel: 'gpt-4o',
   voiceSpeed: 0.95,
@@ -73,9 +73,17 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.OPENAI_KEY, key.trim());
   },
 
+  // ElevenLabs Key
+  getElevenLabsKey: () => {
+    return localStorage.getItem('fluency_elevenlabs_api_key') || import.meta.env.VITE_ELEVENLABS_API_KEY || '';
+  },
+  setElevenLabsKey: (key) => {
+    localStorage.setItem('fluency_elevenlabs_api_key', key.trim());
+  },
+
   // Selected Tutor
   getSelectedTutorId: () => {
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_TUTOR) || 'learna-x';
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_TUTOR) || 'ana-alice';
   },
   setSelectedTutorId: (id) => {
     localStorage.setItem(STORAGE_KEYS.SELECTED_TUTOR, id);

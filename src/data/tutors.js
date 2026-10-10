@@ -1,30 +1,59 @@
 export const TUTORS = [
   {
-    id: 'learna-x',
-    name: 'Learna-X',
-    origin: 'Machine',
-    avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
-    traits: ['Lógico', 'Motivador', 'Flexível'],
+    id: 'ana-alice',
+    name: 'Ana Alice',
+    origin: 'Califórnia, EUA',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
+    traits: ['Amigável', 'Expressiva', 'Inglês do Dia a Dia'],
     tags: [
-      { label: 'Negócios', icon: '💼' },
-      { label: 'Acadêmico', icon: '📚' }
+      { label: 'Conversação', icon: '💬' },
+      { label: 'Gírias & Cultura', icon: '✨' }
     ],
-    bio: 'Criado por engenheiros inovadores, o Learna-X foi desenvolvido para ajudar pessoas a se comunicarem melhor. Com conhecimento avançado em linguística e adaptação por IA, o Learna-X descomplica até os pontos mais difíceis do inglês, guiando os alunos com paciência, precisão e um toque de carisma digital.',
-    voice: 'Google US English',
-    isRobot: true
+    bio: 'Voz jovem, fluida e amigável. Ensina o inglês autêntico das conversas reais com amigos, filmes e séries americanas.',
+    voice: 'en-US',
+    voiceId: 'ORgG8rwdAiMYRug8RJwR'
   },
   {
-    id: 'learna',
-    name: 'Learna',
-    origin: 'American',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80',
-    traits: ['Paciente', 'Metódico', 'Apoiador'],
+    id: 'will',
+    name: 'Will',
+    origin: 'Chicago, EUA',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
+    traits: ['Descontraído', 'Esportes', 'Conexões Rápidas'],
     tags: [
-      { label: 'Geral', icon: '🌍' },
-      { label: 'Inglês dos EUA', icon: '🇺🇸' }
+      { label: 'Esportes', icon: '⚽' },
+      { label: 'Dia a Dia', icon: '🍕' }
     ],
-    bio: 'Especialista em sotaque norte-americano e fluência cotidiana. Metódica e acolhedora, ótima para quem está construindo a base do vocabulário.',
-    voice: 'en-US'
+    bio: 'Voz dinâmica e casual, ótima para bater papo, aprender gírias e dominar as reduções que os americanos usam na rua.',
+    voice: 'en-US',
+    voiceId: 'CstacWqMhJQlnfLPxRG4'
+  },
+  {
+    id: 'andrea-lot',
+    name: 'Andrea Lot',
+    origin: 'Nova York, EUA',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
+    traits: ['Moderna', 'Enérgica', 'Ritmo Nativo'],
+    tags: [
+      { label: 'Viagens', icon: '🗽' },
+      { label: 'Música & Estilo', icon: '🎧' }
+    ],
+    bio: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar com fluidez e entender americanos rápidos.',
+    voice: 'en-US',
+    voiceId: 'HOfBIVLhom4mc9WvXfyH'
+  },
+  {
+    id: 'paulo',
+    name: 'Paulo',
+    origin: 'Austin, Texas, EUA',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
+    traits: ['Calmo', 'Paciente', 'Dicção Nítida'],
+    tags: [
+      { label: 'Para Começar', icon: '🌱' },
+      { label: 'Carreira', icon: '💼' }
+    ],
+    bio: 'Tom calmo, acolhedor e com pronúncia limpa. Perfeito para perder a vergonha de falar e destravar a confiança passo a passo.',
+    voice: 'en-US',
+    voiceId: 'Qrdut83w0Cr152Yb4Xn3'
   },
   {
     id: 'mateo',

@@ -16,21 +16,14 @@ export const TutorSelectModal = ({
   const handlePlayVoice = (tutor, e) => {
     e?.stopPropagation();
     const samplePhrases = {
-      'learna-x': "Hello Victor! I am Learna-X. Let's make learning English simple and enjoyable together.",
-      'learna': "Hi there! I am Learna. I will help you speak American English with total confidence.",
-      'mateo': "Hey! I am Mateo. Get ready to speak English for travel and socializing anywhere!",
-      'hazel': "Hello darling! I'm Hazel from London. Let's have a lovely chat today.",
-      'skye': "G'day! I'm Skye. Let's practice relaxed, natural Australian expressions.",
-      'jasmine': "Hello! I am Jasmine. Don't be shy, we will learn together step by step.",
-      'darius': "Greetings Victor. I am Darius. Let's sharpen your professional communication skills.",
-      'aiko': "Konnichiwa! I am Aiko. We will study systematically and clearly.",
-      'anisha': "Hello! I am Anisha. Let's explore global English and cultural conversations.",
-      'reina': "Hey! I am Reina. Let's bring high energy to your everyday conversation!",
-      'layla': "Hola Victor! I am Layla. Together we will overcome any translation traps.",
-      'santa-claus': "Ho ho ho! Merry learning! Speaking English is wonderful fun!",
-      'mrs-claus': "Hello dear Victor! Take your time, we will practice with warmth and care."
+      'ana-alice': "Olá Victor! Sou a Ana Alice. Vamos praticar o inglês falado do dia a dia juntos?",
+      'will': "E aí Victor, beleza? Sou o Will! Bora falar sobre esportes, dia a dia e dominar o inglês americano?",
+      'andrea-lot': "Oi Victor! Sou a Andrea Lot. Pronta pra te ajudar a destravar e falar inglês rápido e com confiança!",
+      'paulo': "Olá Victor! Sou o Paulo. Vamos aprender no seu ritmo, com calma e pronúncia bem clara."
     };
-    speechAudio.speak(samplePhrases[tutor.id] || `Hello Victor, I am ${tutor.name}.`);
+    speechAudio.speak(samplePhrases[tutor.id] || `Hello Victor, I am ${tutor.name}.`, {
+      voiceId: tutor.voiceId
+    });
   };
 
   const handleConfirm = () => {

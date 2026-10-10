@@ -50,6 +50,8 @@ export const ConversationRoom = ({
   const [textInput, setTextInput] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [showKeyboardInput, setShowKeyboardInput] = useState(false);
+  const [showInspireMenu, setShowInspireMenu] = useState(false);
 
   // Modals
   const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
@@ -114,18 +116,21 @@ export const ConversationRoom = ({
       return;
     }
 
-    // Regular daily lesson Phase 1 (Input Compreensível)
-    const storyText = lesson.phase1?.storyEn || lesson.phase1?.intro || `Hello! Let's practice ${lesson.title} today!`;
-    const introExplanation = lesson.phase1?.storyPt || `Ouça com atenção o contexto de hoje. Foco 100% na escuta e compreensão.`;
-    const initialCard = lesson.phase1?.initialCard || null;
+    // Regular daily lesson: Inicia com saudação contextual pelo horário e escolha livre de assunto
+    const userProfile = StorageService.getUserProfile();
+    const studentName = userProfile.name || 'Victor';
+    const currentHour = new Date().getHours();
+    const greeting = currentHour < 12 ? 'Bom dia' : currentHour < 18 ? 'Boa tarde' : 'Boa noite';
+
+    const naturalOpeningPt = `Olá, ${studentName}! ${greeting}! Hoje vamos focar no inglês falado real que os americanos usam no dia a dia, sem regras chatas de escola. Você tem preferência de assunto pra gente treinar hoje? Quer falar sobre futebol, trabalho, viagens, séries ou outro tema do seu dia?`;
 
     const initialMsg = {
       id: 'msg-init-1',
       sender: 'ai',
-      text: `${introExplanation}\n\n"${storyText}"`,
-      messagePt: introExplanation,
-      card: initialCard,
-      translationPt: introExplanation,
+      text: naturalOpeningPt,
+      messagePt: naturalOpeningPt,
+      card: null,
+      translationPt: naturalOpeningPt,
       timestamp: new Date()
     };
     
@@ -133,15 +138,11 @@ export const ConversationRoom = ({
 
     if (!isMuted) {
       setIsAiSpeaking(true);
-      if (initialCard?.phraseTarget) {
-        speechAudio.speakBilingual({
-          introPt: introExplanation,
-          phraseEn: storyText,
-          onEnd: () => setIsAiSpeaking(false)
-        });
-      } else {
-        speechAudio.speak(introExplanation, { lang: 'pt-BR', onEnd: () => setIsAiSpeaking(false) });
-      }
+      speechAudio.speak(naturalOpeningPt, {
+        lang: 'pt-BR',
+        voiceId: tutor.voiceId,
+        onEnd: () => setIsAiSpeaking(false)
+      });
     }
   }, [lesson, tutor, isExam]);
 
@@ -242,17 +243,20 @@ export const ConversationRoom = ({
         if (isExam && (aiResponse.inCharacterSpeechEn || aiResponse.text)) {
           speechAudio.speak(aiResponse.inCharacterSpeechEn || aiResponse.text, {
             lang: 'en-US',
+            voiceId: tutor.voiceId,
             onEnd: () => setIsAiSpeaking(false)
           });
         } else if (aiResponse.card?.phraseTarget) {
           speechAudio.speakBilingual({
             introPt: aiResponse.messagePt || aiResponse.text,
             phraseEn: aiResponse.card.phraseTarget,
+            voiceId: tutor.voiceId,
             onEnd: () => setIsAiSpeaking(false)
           });
         } else {
           speechAudio.speak(aiResponse.messagePt || aiResponse.text, {
             lang: 'pt-BR',
+            voiceId: tutor.voiceId,
             onEnd: () => setIsAiSpeaking(false)
           });
         }
@@ -488,49 +492,54 @@ export const ConversationRoom = ({
       <footer className="p-3 sm:p-4 px-4 sm:px-8 border-t border-slate-200 bg-white shadow-lg shrink-0">
         <div className="max-w-3xl mx-auto space-y-3">
           
-          {/* Quick Inspiring Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-            <span className="text-slate-400 font-bold flex items-center gap-1 shrink-0 text-[11px]">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-              Respostas rápidas:
-            </span>
-            
-            {(isExam ? [
-              "Can I get a regular coffee, please?",
-              "With oat milk, please.",
-              "I will pay with card.",
-              "Thank you so much!"
-            ] : [
-              "Hello! Nice to meet you.",
-              "I'm good, and you?",
-              "Can I get a coffee, please?",
-              "What is your name?",
-              "Where are you from?"
-            ]).map((hint, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleInspireHint(hint)}
-                className="px-3 py-1 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 font-semibold shrink-0 transition-colors border border-slate-200/60"
-              >
-                {hint}
-              </button>
-            ))}
-          </div>
+          {/* Quick Inspiring Chips (Alterna com o botão Inspirar) */}
+          {showInspireMenu && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar text-xs animate-fadeIn bg-blue-50/70 p-2.5 rounded-2xl border border-blue-100">
+              <span className="text-blue-700 font-black flex items-center gap-1 shrink-0 text-[11px]">
+                <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                Dicas de resposta:
+              </span>
+              
+              {[
+                "I'd love to talk about soccer!",
+                "Let's practice ordering food.",
+                "Can you give me an example?",
+                "What do native Americans say?",
+                "How do I say that naturally?"
+              ].map((hint, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    handleInspireHint(hint);
+                    setShowKeyboardInput(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-blue-600 hover:text-white text-slate-700 font-bold shrink-0 transition-all border border-blue-200/60 shadow-2xs"
+                >
+                  {hint}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Recording UI */}
           {isRecording ? (
-            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between shadow-inner animate-pulse">
+            <div className="p-4 rounded-3xl bg-blue-50 border-2 border-blue-300 flex items-center justify-between shadow-lg shadow-blue-500/10 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
-                <span className="text-xs font-black text-emerald-800">
-                  Ouvindo... Fale sua frase em inglês ({formatTimer(recordingSeconds)})
-                </span>
+                <div className="w-4 h-4 rounded-full bg-blue-600 animate-ping"></div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-black text-blue-900">
+                    Gravando sua fala em inglês...
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-blue-600">
+                    {formatTimer(recordingSeconds)} • Fale naturalmente
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCancelRecording}
-                  className="p-2.5 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs transition-colors"
+                  className="p-3 rounded-2xl bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 font-bold text-xs transition-colors shadow-xs"
                   title="Cancelar gravação"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -538,41 +547,41 @@ export const ConversationRoom = ({
 
                 <button
                   onClick={handleStopRecordingAndSend}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-1.5"
+                  className="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-md shadow-blue-600/30 transition-all flex items-center gap-2"
                 >
-                  <ArrowUp className="w-4 h-4 stroke-[3]" />
+                  <Send className="w-4 h-4 stroke-[2.5]" />
                   <span>Enviar Áudio</span>
                 </button>
               </div>
             </div>
-          ) : (
+          ) : showKeyboardInput ? (
+            /* Modo Teclado ("Tipo") */
             <form 
               onSubmit={(e) => {
                 e.preventDefault();
                 handleUserSend(textInput);
               }}
-              className="flex items-center gap-2.5"
+              className="flex items-center gap-2.5 animate-fadeIn"
             >
+              <button
+                type="button"
+                onClick={() => setShowKeyboardInput(false)}
+                className="p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors"
+                title="Voltar ao modo voz"
+              >
+                Voltar
+              </button>
+
               <div className="flex-1 relative flex items-center">
                 <input
                   ref={inputRef}
                   type="text"
                   value={textInput}
                   onChange={(e) => setTextInput(e.target.value)}
-                  placeholder={isExam ? "Responda ao atendente em inglês..." : "Digite sua resposta em inglês ou aperte no microfone ao lado..."}
+                  placeholder="Digite sua resposta em inglês..."
                   className="w-full px-4 py-3 sm:py-3.5 pr-10 rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all font-medium"
                 />
               </div>
-
-              <button
-                type="button"
-                id="btn-voice-record"
-                onClick={handleStartRecording}
-                className="w-12 h-12 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 flex items-center justify-center shadow-xs active:scale-95 transition-all shrink-0"
-                title="Aperte para falar"
-              >
-                <Mic className="w-5 h-5" />
-              </button>
 
               <button
                 type="submit"
@@ -583,6 +592,47 @@ export const ConversationRoom = ({
                 <Send className="w-3.5 h-3.5" />
               </button>
             </form>
+          ) : (
+            /* Modo Padrão Mobile/Imersivo: Tipo | Botão Azul Redondo Grande | Inspirar */
+            <div className="flex items-center justify-around py-2 max-w-sm mx-auto">
+              {/* Botão Tipo (Teclado) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowKeyboardInput(true);
+                  setTimeout(() => inputRef.current?.focus(), 100);
+                }}
+                className="flex flex-col items-center gap-1.5 text-slate-600 hover:text-blue-600 group transition-all"
+              >
+                <div className="w-14 h-14 rounded-full bg-blue-50 group-hover:bg-blue-100 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs group-active:scale-95 transition-all">
+                  <Languages className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-slate-500 group-hover:text-blue-600">Tipo</span>
+              </button>
+
+              {/* Botão Central Azul Grande (Microfone) */}
+              <button
+                type="button"
+                id="btn-voice-record-main"
+                onClick={handleStartRecording}
+                className="relative -top-1 w-20 h-20 rounded-full bg-gradient-to-tr from-blue-600 via-blue-500 to-sky-400 hover:from-blue-700 hover:to-sky-500 text-white flex items-center justify-center shadow-xl shadow-blue-500/40 active:scale-90 transition-all cursor-pointer ring-4 ring-blue-100"
+                title="Aperte para falar em inglês"
+              >
+                <Mic className="w-9 h-9 stroke-[2.2]" />
+              </button>
+
+              {/* Botão Inspirar (Dicas rápidas) */}
+              <button
+                type="button"
+                onClick={() => setShowInspireMenu(prev => !prev)}
+                className="flex flex-col items-center gap-1.5 text-slate-600 hover:text-blue-600 group transition-all"
+              >
+                <div className="w-14 h-14 rounded-full bg-blue-50 group-hover:bg-blue-100 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs group-active:scale-95 transition-all">
+                  <Lightbulb className="w-6 h-6" />
+                </div>
+                <span className="text-xs font-bold text-slate-500 group-hover:text-blue-600">Inspirar</span>
+              </button>
+            </div>
           )}
 
         </div>

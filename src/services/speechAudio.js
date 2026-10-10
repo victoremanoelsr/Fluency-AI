@@ -1,4 +1,5 @@
 import { StorageService } from './storage';
+import { elevenLabsService, ELEVENLABS_TUTORS } from './elevenlabs';
 
 class SpeechAudioService {
   constructor() {
@@ -9,12 +10,19 @@ class SpeechAudioService {
     this.isPlaying = false;
     this.currentAudioElement = null;
     this.onStateChange = null;
+    this.currentTutorVoiceId = '21m00Tcm4TlvDq8ikWAM'; // Emma (Rachel) padrão
 
     if (this.synth) {
       this.loadVoices();
       if (typeof window !== 'undefined') {
         window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
       }
+    }
+  }
+
+  setTutorVoice(voiceId) {
+    if (voiceId) {
+      this.currentTutorVoiceId = voiceId;
     }
   }
 
@@ -134,24 +142,55 @@ class SpeechAudioService {
   /**
    * Speak plain text in a single language ('pt-BR' or 'en-US')
    */
-  speak(text, { lang = 'en-US', rate = 0.95, pitch = 1.0, onStart, onEnd, onError } = {}) {
-    if (!this.synth) {
-      console.warn('SpeechSynthesis is not supported in this browser.');
-      return;
-    }
-
+  async speak(text, { lang = 'en-US', rate = 0.95, pitch = 1.0, voiceId = null, onStart, onEnd, onError } = {}) {
     this.stop();
-
     if (!text || text.trim() === '') return;
-
-    if (!this.selectedVoiceEn || !this.selectedVoicePt) {
-      this.loadVoices();
-    }
 
     const cleanedText = text
       .replace(/[*_~`#[\]]/g, '')
       .replace(/\(.*?\)/g, '')
       .trim();
+
+    // 1. Tentar ElevenLabs se houver chave configurada
+    const targetVoiceId = voiceId || this.currentTutorVoiceId || '21m00Tcm4TlvDq8ikWAM';
+    if (elevenLabsService.getApiKey()) {
+      try {
+        this.isPlaying = true;
+        if (onStart) onStart();
+        if (this.onStateChange) this.onStateChange(true);
+
+        const played = await elevenLabsService.play(cleanedText, targetVoiceId, {
+          onStart: () => {},
+          onEnd: () => {
+            this.isPlaying = false;
+            if (onEnd) onEnd();
+            if (this.onStateChange) this.onStateChange(false);
+          },
+          onError: (err) => {
+            console.warn('Erro ElevenLabs, caindo para sintetizador do navegador:', err);
+            this.speakFallback(cleanedText, { lang, rate, pitch, onEnd, onError });
+          }
+        });
+
+        if (played) return;
+      } catch (err) {
+        console.warn('Falha no ElevenLabs TTS, usando voz nativa do sistema:', err);
+      }
+    }
+
+    // Fallback: Voz nativa do navegador
+    this.speakFallback(cleanedText, { lang, rate, pitch, onStart, onEnd, onError });
+  }
+
+  speakFallback(cleanedText, { lang = 'en-US', rate = 0.95, pitch = 1.0, onStart, onEnd, onError } = {}) {
+    if (!this.synth) {
+      if (onEnd) onEnd();
+      return;
+    }
+
+    if (!this.selectedVoiceEn || !this.selectedVoicePt) {
+      this.loadVoices();
+    }
 
     const utterance = new SpeechSynthesisUtterance(cleanedText);
 
@@ -182,6 +221,7 @@ class SpeechAudioService {
     utterance.onerror = (event) => {
       this.isPlaying = false;
       if (onError) onError(event);
+      if (onEnd) onEnd();
       if (this.onStateChange) this.onStateChange(false);
     };
 
@@ -190,23 +230,31 @@ class SpeechAudioService {
 
   /**
    * Speak bilingually: First speaks tutor intro in Portuguese (pt-BR),
-   * then pauses smoothly (350ms) and speaks the target phrase in native English (en-US).
+   * then pauses smoothly and speaks the target phrase in native English (en-US).
    */
-  speakBilingual({ introPt, phraseEn, onStart, onEnd } = {}) {
-    if (!this.synth) return;
-
+  async speakBilingual({ introPt, phraseEn, voiceId = null, onStart, onEnd } = {}) {
     this.stop();
-
     if (!introPt && !phraseEn) return;
 
-    if (!introPt && phraseEn) {
-      this.speak(phraseEn, { lang: 'en-US', onStart, onEnd });
-      return;
+    const fullBilingualText = `${introPt || ''}. ${phraseEn || ''}`.trim();
+
+    // Com o modelo eleven_multilingual_v2, ele fala português e inglês perfeitamente numa única passagem
+    const targetVoiceId = voiceId || this.currentTutorVoiceId || '21m00Tcm4TlvDq8ikWAM';
+    if (elevenLabsService.getApiKey()) {
+      return this.speak(fullBilingualText, {
+        lang: 'pt-BR',
+        voiceId: targetVoiceId,
+        onStart,
+        onEnd
+      });
     }
 
+    // Fallback nativo
+    if (!introPt && phraseEn) {
+      return this.speak(phraseEn, { lang: 'en-US', onStart, onEnd });
+    }
     if (introPt && !phraseEn) {
-      this.speak(introPt, { lang: 'pt-BR', onStart, onEnd });
-      return;
+      return this.speak(introPt, { lang: 'pt-BR', onStart, onEnd });
     }
 
     if (!this.selectedVoiceEn || !this.selectedVoicePt) {
@@ -224,13 +272,11 @@ class SpeechAudioService {
     if (this.selectedVoicePt) ptUtterance.voice = this.selectedVoicePt;
     ptUtterance.lang = 'pt-BR';
     ptUtterance.rate = 1.0;
-    ptUtterance.pitch = 1.0;
 
     const enUtterance = new SpeechSynthesisUtterance(cleanEn);
     if (this.selectedVoiceEn) enUtterance.voice = this.selectedVoiceEn;
     enUtterance.lang = 'en-US';
-    enUtterance.rate = 0.88; // cadência clara e natural para o aluno
-    enUtterance.pitch = 1.0;
+    enUtterance.rate = 0.88;
 
     ptUtterance.onend = () => {
       setTimeout(() => {
@@ -240,9 +286,7 @@ class SpeechAudioService {
     };
 
     ptUtterance.onerror = () => {
-      if (this.isPlaying) {
-        this.synth.speak(enUtterance);
-      }
+      if (this.isPlaying) this.synth.speak(enUtterance);
     };
 
     enUtterance.onend = () => {
@@ -261,6 +305,7 @@ class SpeechAudioService {
   }
 
   stop() {
+    elevenLabsService.stop();
     if (this.currentAudioElement) {
       this.currentAudioElement.pause();
       this.currentAudioElement = null;
