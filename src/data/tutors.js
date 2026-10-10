@@ -11,7 +11,7 @@ export const TUTORS = [
     ],
     bio: 'Voz jovem, fluida e amigável. Ensina o inglês autêntico das conversas reais com amigos, filmes e séries americanas.',
     voice: 'en-US',
-    voiceId: 'ORgG8rwdAiMYRug8RJwR'
+    voiceId: 'Xb7hH8MSUJpSbSDYk0k2'
   },
   {
     id: 'will',
@@ -25,7 +25,7 @@ export const TUTORS = [
     ],
     bio: 'Voz dinâmica e casual, ótima para bater papo, aprender gírias e dominar as reduções que os americanos usam na rua.',
     voice: 'en-US',
-    voiceId: 'CstacWqMhJQlnfLPxRG4'
+    voiceId: 'TX3LPaxmHKxFdv7VOQHJ'
   },
   {
     id: 'andrea-lot',
@@ -39,7 +39,7 @@ export const TUTORS = [
     ],
     bio: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar com fluidez e entender americanos rápidos.',
     voice: 'en-US',
-    voiceId: 'HOfBIVLhom4mc9WvXfyH'
+    voiceId: 'EXAVITQu4vr4xnSDxMaL'
   },
   {
     id: 'paulo',
@@ -53,7 +53,7 @@ export const TUTORS = [
     ],
     bio: 'Tom calmo, acolhedor e com pronúncia limpa. Perfeito para perder a vergonha de falar e destravar a confiança passo a passo.',
     voice: 'en-US',
-    voiceId: 'Qrdut83w0Cr152Yb4Xn3'
+    voiceId: 'JBFqnCBsd6RMkjVDRZzb'
   },
   {
     id: 'mateo',

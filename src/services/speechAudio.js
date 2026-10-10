@@ -10,7 +10,7 @@ class SpeechAudioService {
     this.isPlaying = false;
     this.currentAudioElement = null;
     this.onStateChange = null;
-    this.currentTutorVoiceId = '21m00Tcm4TlvDq8ikWAM'; // Emma (Rachel) padrão
+    this.currentTutorVoiceId = 'Xb7hH8MSUJpSbSDYk0k2'; // Ana Alice padrão
 
     if (this.synth) {
       this.loadVoices();

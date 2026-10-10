@@ -1,13 +1,13 @@
 import { StorageService } from './storage';
 
-// As 4 Vozes Escolhidas pelo Usuário no ElevenLabs com seus Voice IDs oficiais
+// As 4 Vozes Oficiais do ElevenLabs ativas e liberadas com Status 200
 export const ELEVENLABS_TUTORS = [
   {
     id: 'ana-alice',
     name: 'Ana Alice',
     origin: 'Califórnia, EUA',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'ORgG8rwdAiMYRug8RJwR',
+    voiceId: 'Xb7hH8MSUJpSbSDYk0k2', // Alice - Clara, educadora, fluida e amigável
     style: 'Jovem, expressiva e natural',
     description: 'Voz super fluida e amigável. Ótima para praticar o inglês falado do dia a dia e ganhar ritmo.'
   },
@@ -16,7 +16,7 @@ export const ELEVENLABS_TUTORS = [
     name: 'Will',
     origin: 'Chicago, EUA',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'CstacWqMhJQlnfLPxRG4',
+    voiceId: 'TX3LPaxmHKxFdv7VOQHJ', // Liam - Jovem, dinâmico, energia de esportes e ruas
     style: 'Descontraído, esportes e gírias',
     description: 'Voz dinâmica e casual, perfeita para aprender gírias, conexões de palavras e conversação informal.'
   },
@@ -25,7 +25,7 @@ export const ELEVENLABS_TUTORS = [
     name: 'Andrea Lot',
     origin: 'Nova York, EUA',
     avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'HOfBIVLhom4mc9WvXfyH',
+    voiceId: 'EXAVITQu4vr4xnSDxMaL', // Sarah - Confiante, madura e moderna
     style: 'Moderna, enérgica e envolvente',
     description: 'Dicção refinada e ritmo nativo empolgante, ideal para quem quer falar rápido sem travar.'
   },
@@ -34,7 +34,7 @@ export const ELEVENLABS_TUTORS = [
     name: 'Paulo',
     origin: 'Austin, Texas, EUA',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500&auto=format&fit=crop&q=80',
-    voiceId: 'Qrdut83w0Cr152Yb4Xn3',
+    voiceId: 'JBFqnCBsd6RMkjVDRZzb', // George - Calmo, ressonante e dicção perfeita
     style: 'Calmo, claro e paciente',
     description: 'Tom acolhedor e dicção super nítida. Excelente para destravar a fala passo a passo sem pressão.'
   }
